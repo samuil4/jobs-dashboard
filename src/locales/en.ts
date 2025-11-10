@@ -66,6 +66,10 @@ export default {
       empty: 'No updates yet',
       entry: '{quantity} added on {date}',
     },
+    deleteModal: {
+      title: 'Delete job',
+      message: 'Delete "{name}" permanently? This removes all production history and cannot be undone.',
+    },
     alreadyCompleted: 'This job is already completed. No remaining parts to update.',
     confirmDelete:
       'Delete this job permanently? This action cannot be undone and will remove its history.',

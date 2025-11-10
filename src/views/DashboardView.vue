@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
+import ConfirmModal from '../components/ConfirmModal.vue'
 import JobCard from '../components/dashboard/JobCard.vue'
 import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
@@ -19,6 +20,11 @@ const { filteredJobs, loading, error, showArchived, statusFilter, searchTerm } =
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
 const editingJobId = ref<string | null>(null)
+const deleteModal = reactive({
+  show: false,
+  jobId: null as string | null,
+  jobName: '',
+})
 
 const modalInitialValues = computed(() => {
   if (!editingJobId.value) return undefined
@@ -72,10 +78,25 @@ async function handleArchive(jobId: string, archive: boolean) {
   }
 }
 
-async function handleDelete(jobId: string) {
-  if (!confirm(t('jobs.confirmDelete'))) return
+function handleDelete(jobId: string) {
+  const job = jobsStore.jobs.find((item) => item.id === jobId)
+  if (!job) return
+  deleteModal.jobId = jobId
+  deleteModal.jobName = job.name
+  deleteModal.show = true
+}
+
+function closeDeleteModal() {
+  deleteModal.show = false
+  deleteModal.jobId = null
+  deleteModal.jobName = ''
+}
+
+async function confirmDelete() {
+  if (!deleteModal.jobId) return
   try {
-    await jobsStore.deleteJob(jobId)
+    await jobsStore.deleteJob(deleteModal.jobId)
+    closeDeleteModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.deleteJob'))
@@ -162,6 +183,16 @@ const archivedToggleLabel = computed(() =>
       :initial-values="modalInitialValues"
       @close="showModal = false"
       @submit="handleModalSubmit"
+    />
+
+    <ConfirmModal
+      :show="deleteModal.show"
+      :title="t('jobs.deleteModal.title')"
+      :description="t('jobs.deleteModal.message', { name: deleteModal.jobName })"
+      :confirm-label="t('jobs.delete')"
+      confirm-variant="danger"
+      @cancel="closeDeleteModal"
+      @confirm="confirmDelete"
     />
   </section>
 </template>
