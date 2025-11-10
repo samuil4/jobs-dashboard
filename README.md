@@ -98,6 +98,23 @@ npm run dev
 npm run build
 ```
 
+### Deploy to Vercel
+
+1. Push this repository to GitHub (or another Git provider supported by Vercel).
+2. In the Vercel dashboard choose **Add New Project** → **Import Git Repository** and select your repo.
+3. When prompted for build settings:
+   - **Framework Preset:** `Vite`
+   - **Build Command:** `npm run build`
+   - **Install Command:** `npm install`
+   - **Output Directory:** `dist`
+4. Define the required environment variables under **Settings → Environment Variables**:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - (optional) `VITE_SUPABASE_AUTH_EMAIL_DOMAIN`
+5. Deploy. Subsequent pushes to the default branch (and PR branches) will trigger automatic builds.
+
+The included `vercel.json` ensures history-based routes (e.g. `/jobs/active`) fall back to `index.html`, so client-side routing works for direct URL visits.
+
 ### Lint
 
 ```bash

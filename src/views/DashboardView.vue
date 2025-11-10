@@ -25,6 +25,12 @@ const deleteModal = reactive({
   jobId: null as string | null,
   jobName: '',
 })
+const archiveModal = reactive({
+  show: false,
+  jobId: null as string | null,
+  jobName: '',
+  action: 'archive' as 'archive' | 'unarchive',
+})
 
 const modalInitialValues = computed(() => {
   if (!editingJobId.value) return undefined
@@ -67,11 +73,27 @@ async function handleModalSubmit(payload: { name: string; partsNeeded: number; a
   }
 }
 
-async function handleArchive(jobId: string, archive: boolean) {
-  const messageKey = archive ? 'jobs.confirmArchive' : 'jobs.confirmUnarchive'
-  if (!confirm(t(messageKey))) return
+function handleArchive(jobId: string, archive: boolean) {
+  const job = jobsStore.jobs.find((item) => item.id === jobId)
+  if (!job) return
+  archiveModal.jobId = jobId
+  archiveModal.jobName = job.name
+  archiveModal.action = archive ? 'archive' : 'unarchive'
+  archiveModal.show = true
+}
+
+function closeArchiveModal() {
+  archiveModal.show = false
+  archiveModal.jobId = null
+  archiveModal.jobName = ''
+}
+
+async function confirmArchive() {
+  if (!archiveModal.jobId) return
+  const shouldArchive = archiveModal.action === 'archive'
   try {
-    await jobsStore.archiveJob(jobId, archive)
+    await jobsStore.archiveJob(archiveModal.jobId, shouldArchive)
+    closeArchiveModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.updateJob'))
@@ -114,6 +136,22 @@ async function handleProduction(jobId: string, delta: number) {
 
 const archivedToggleLabel = computed(() =>
   showArchived.value ? t('jobs.filter.hideArchived') : t('jobs.filter.showArchived')
+)
+
+const archiveModalTitle = computed(() =>
+  archiveModal.action === 'archive'
+    ? t('jobs.archiveModal.archiveTitle')
+    : t('jobs.archiveModal.unarchiveTitle')
+)
+
+const archiveModalMessage = computed(() =>
+  archiveModal.action === 'archive'
+    ? t('jobs.archiveModal.archiveMessage', { name: archiveModal.jobName })
+    : t('jobs.archiveModal.unarchiveMessage', { name: archiveModal.jobName })
+)
+
+const archiveConfirmLabel = computed(() =>
+  archiveModal.action === 'archive' ? t('jobs.archive') : t('jobs.unarchive')
 )
 </script>
 
@@ -193,6 +231,16 @@ const archivedToggleLabel = computed(() =>
       confirm-variant="danger"
       @cancel="closeDeleteModal"
       @confirm="confirmDelete"
+    />
+
+    <ConfirmModal
+      :show="archiveModal.show"
+      :title="archiveModalTitle"
+      :description="archiveModalMessage"
+      :confirm-label="archiveConfirmLabel"
+      confirm-variant="secondary"
+      @cancel="closeArchiveModal"
+      @confirm="confirmArchive"
     />
   </section>
 </template>

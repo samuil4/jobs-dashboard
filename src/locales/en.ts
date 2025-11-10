@@ -70,6 +70,12 @@ export default {
       title: 'Delete job',
       message: 'Delete "{name}" permanently? This removes all production history and cannot be undone.',
     },
+    archiveModal: {
+      archiveTitle: 'Archive job',
+      unarchiveTitle: 'Unarchive job',
+      archiveMessage: 'Archive "{name}"? You can restore it later from archived jobs.',
+      unarchiveMessage: 'Restore "{name}" to the active list?',
+    },
     alreadyCompleted: 'This job is already completed. No remaining parts to update.',
     confirmDelete:
       'Delete this job permanently? This action cannot be undone and will remove its history.',
