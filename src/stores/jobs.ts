@@ -13,6 +13,7 @@ import type {
 } from '../types/job'
 
 export const ASSIGNEE_OPTIONS: Assignee[] = ['Samuil', 'Oleksii', 'Veselin']
+export const DEFAULT_ASSIGNEE: Assignee = ASSIGNEE_OPTIONS[0]!
 
 type StatusFilter = 'all' | 'active' | 'completed' | 'archived'
 

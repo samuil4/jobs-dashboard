@@ -1,12 +1,14 @@
 export type Assignee = 'Samuil' | 'Oleksii' | 'Veselin'
 
+export type JobStatus = 'active' | 'completed' | 'archived'
+
 export interface JobRecord {
   id: string
   name: string
   parts_needed: number
   parts_produced: number
   archived: boolean
-  status: 'active' | 'completed'
+  status: JobStatus
   assignee: Assignee
   created_at: string
   updated_at: string

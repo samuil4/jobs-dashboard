@@ -2,7 +2,7 @@
 import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { ASSIGNEE_OPTIONS } from '../../stores/jobs'
+import { ASSIGNEE_OPTIONS, DEFAULT_ASSIGNEE } from '../../stores/jobs'
 import type { Assignee } from '../../types/job'
 
 const props = defineProps<{
@@ -25,7 +25,7 @@ const { t } = useI18n()
 const form = reactive({
   name: '',
   partsNeeded: 0,
-  assignee: ASSIGNEE_OPTIONS[0] as Assignee,
+  assignee: DEFAULT_ASSIGNEE,
   touched: false,
 })
 
@@ -35,7 +35,7 @@ watch(
     if (!values) {
       form.name = ''
       form.partsNeeded = 0
-      form.assignee = ASSIGNEE_OPTIONS[0]
+      form.assignee = DEFAULT_ASSIGNEE
       return
     }
     form.name = values.name
