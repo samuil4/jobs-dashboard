@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 import ConfirmModal from '../components/ConfirmModal.vue'
+import HistoryEditModal from '../components/dashboard/HistoryEditModal.vue'
 import JobCard from '../components/dashboard/JobCard.vue'
 import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
@@ -30,6 +31,19 @@ const archiveModal = reactive({
   jobId: null as string | null,
   jobName: '',
   action: 'archive' as 'archive' | 'unarchive',
+})
+const historyEditModal = reactive({
+  show: false,
+  jobId: null as string | null,
+  historyId: null as string | null,
+  currentDelta: 0,
+})
+const historyDeleteModal = reactive({
+  show: false,
+  jobId: null as string | null,
+  historyId: null as string | null,
+  jobName: '',
+  delta: 0,
 })
 
 const modalInitialValues = computed(() => {
@@ -134,6 +148,61 @@ async function handleProduction(jobId: string, delta: number) {
   }
 }
 
+function handleEditHistory(jobId: string, historyId: string, currentDelta: number) {
+  historyEditModal.jobId = jobId
+  historyEditModal.historyId = historyId
+  historyEditModal.currentDelta = currentDelta
+  historyEditModal.show = true
+}
+
+function closeHistoryEditModal() {
+  historyEditModal.show = false
+  historyEditModal.jobId = null
+  historyEditModal.historyId = null
+  historyEditModal.currentDelta = 0
+}
+
+async function handleSaveHistoryEdit(newDelta: number) {
+  if (!historyEditModal.jobId || !historyEditModal.historyId) return
+  try {
+    await jobsStore.updateHistoryItem(historyEditModal.jobId, historyEditModal.historyId, newDelta)
+    closeHistoryEditModal()
+  } catch (err) {
+    console.error(err)
+    alert(t('errors.updateProduction'))
+  }
+}
+
+function handleDeleteHistory(jobId: string, historyId: string) {
+  const job = jobsStore.jobs.find((item) => item.id === jobId)
+  const historyEntry = job?.job_updates.find((entry) => entry.id === historyId)
+  if (!job || !historyEntry) return
+  historyDeleteModal.jobId = jobId
+  historyDeleteModal.historyId = historyId
+  historyDeleteModal.jobName = job.name
+  historyDeleteModal.delta = historyEntry.delta
+  historyDeleteModal.show = true
+}
+
+function closeHistoryDeleteModal() {
+  historyDeleteModal.show = false
+  historyDeleteModal.jobId = null
+  historyDeleteModal.historyId = null
+  historyDeleteModal.jobName = ''
+  historyDeleteModal.delta = 0
+}
+
+async function confirmDeleteHistory() {
+  if (!historyDeleteModal.jobId || !historyDeleteModal.historyId) return
+  try {
+    await jobsStore.deleteHistoryItem(historyDeleteModal.jobId, historyDeleteModal.historyId)
+    closeHistoryDeleteModal()
+  } catch (err) {
+    console.error(err)
+    alert(t('errors.updateProduction'))
+  }
+}
+
 const archivedToggleLabel = computed(() =>
   showArchived.value ? t('jobs.filter.hideArchived') : t('jobs.filter.showArchived')
 )
@@ -212,6 +281,8 @@ const archiveConfirmLabel = computed(() =>
         @archive="handleArchive"
         @delete="handleDelete"
         @production="handleProduction"
+        @editHistory="handleEditHistory"
+        @deleteHistory="handleDeleteHistory"
       />
     </div>
 
@@ -241,6 +312,26 @@ const archiveConfirmLabel = computed(() =>
       confirm-variant="secondary"
       @cancel="closeArchiveModal"
       @confirm="confirmArchive"
+    />
+
+    <HistoryEditModal
+      :show="historyEditModal.show"
+      :current-delta="historyEditModal.currentDelta"
+      @close="closeHistoryEditModal"
+      @save="handleSaveHistoryEdit"
+    />
+
+    <ConfirmModal
+      :show="historyDeleteModal.show"
+      :title="t('jobs.history.deleteTitle')"
+      :description="t('jobs.history.deleteMessage', {
+        quantity: historyDeleteModal.delta,
+        jobName: historyDeleteModal.jobName,
+      })"
+      :confirm-label="t('jobs.history.delete')"
+      confirm-variant="danger"
+      @cancel="closeHistoryDeleteModal"
+      @confirm="confirmDeleteHistory"
     />
   </section>
 </template>

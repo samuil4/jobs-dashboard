@@ -14,6 +14,8 @@ const emit = defineEmits<{
   (e: 'archive', jobId: string, archived: boolean): void
   (e: 'delete', jobId: string): void
   (e: 'production', jobId: string, delta: number): void
+  (e: 'editHistory', jobId: string, historyId: string, currentDelta: number): void
+  (e: 'deleteHistory', jobId: string, historyId: string): void
 }>()
 
 const { t } = useI18n()
@@ -122,8 +124,26 @@ function formatHistoryEntry(delta: number, createdAt: string) {
           {{ t('jobs.history.empty') }}
         </div>
         <ul v-else>
-          <li v-for="update in job.job_updates" :key="update.id">
-            {{ formatHistoryEntry(update.delta, update.created_at) }}
+          <li v-for="update in job.job_updates" :key="update.id" class="history-item">
+            <span class="history-entry">{{ formatHistoryEntry(update.delta, update.created_at) }}</span>
+            <div class="history-actions">
+              <button
+                class="btn-icon"
+                type="button"
+                :title="t('jobs.history.edit')"
+                @click="emit('editHistory', job.id, update.id, update.delta)"
+              >
+                {{ t('jobs.history.edit') }}
+              </button>
+              <button
+                class="btn-icon btn-icon-danger"
+                type="button"
+                :title="t('jobs.history.delete')"
+                @click="emit('deleteHistory', job.id, update.id)"
+              >
+                {{ t('jobs.history.delete') }}
+              </button>
+            </div>
           </li>
         </ul>
       </div>
@@ -257,14 +277,65 @@ function formatHistoryEntry(delta: number, createdAt: string) {
   padding: 12px;
 }
 
-.history li {
-  padding: 6px 0;
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(107, 114, 128, 0.2);
   font-size: 13px;
 }
 
-.history li:last-child {
+.history-item:last-child {
   border-bottom: none;
+}
+
+.history-entry {
+  flex: 1;
+}
+
+.history-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.history-item:hover .history-actions {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .history-actions {
+    opacity: 1;
+  }
+}
+
+.btn-icon {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-icon-danger {
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.btn-icon-danger:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
 }
 
 .history-empty {
