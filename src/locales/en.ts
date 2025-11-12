@@ -30,6 +30,7 @@ export default {
     jobName: 'Job name',
     partsNeeded: 'Parts needed',
     partsProduced: 'Parts produced',
+    partsOverproduced: 'Overproduced parts',
     partsRemaining: 'Parts remaining',
     dateAdded: 'Date added',
     assignee: 'Assignee',
@@ -50,7 +51,7 @@ export default {
     updateProduction: 'Add production',
     productionDelta: 'Produced quantity',
     deltaHelp:
-      'Enter how many additional parts were produced. The total production will be updated and recorded in history.',
+      'Enter how many additional parts were produced. Overproduction beyond requested amount will be tracked separately and recorded in history.',
     filter: {
       showArchived: 'Show archived',
       hideArchived: 'Hide archived',

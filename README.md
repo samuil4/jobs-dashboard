@@ -29,6 +29,7 @@ create table public.jobs (
   name text not null,
   parts_needed integer not null,
   parts_produced integer not null default 0,
+  parts_overproduced integer not null default 0,
   archived boolean not null default false,
   status text not null default 'active' check (status in ('active','completed','archived')),
   assignee text not null check (assignee in ('Samuil','Oleksii','Veselin')),
@@ -64,6 +65,19 @@ create policy "job updates are writable by authenticated users"
   on public.job_updates for all
   using (auth.role() = 'authenticated');
 ```
+
+2.1. If you have an existing database (created before overproduction support was added), run this migration:
+
+```sql
+-- Add parts_overproduced column to jobs table
+ALTER TABLE public.jobs
+ADD COLUMN parts_overproduced INTEGER NOT NULL DEFAULT 0;
+
+-- Add comment for clarity
+COMMENT ON COLUMN public.jobs.parts_overproduced IS 'Number of parts produced beyond the requested amount (parts_needed)';
+```
+
+Note: If you're creating a new database, the `parts_overproduced` column is already included in the table creation SQL above.
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
 

@@ -24,6 +24,8 @@ const partsRemaining = computed(() =>
   Math.max(props.job.parts_needed - props.job.parts_produced, 0)
 )
 
+const partsOverproduced = computed(() => props.job.parts_overproduced ?? 0)
+
 const statusBadgeClass = computed(() => {
   switch (props.job.status) {
     case 'completed':
@@ -42,22 +44,6 @@ async function handleProductionSubmit() {
     return
   }
 
-  if (partsRemaining.value <= 0) {
-    localError.value = t('jobs.alreadyCompleted')
-    return
-  }
-
-  if (partsRemaining.value > 0 && productionInput.value > partsRemaining.value) {
-    const shouldProceed = confirm(
-      t('jobs.confirmOverProduction', {
-        remaining: partsRemaining.value,
-        added: productionInput.value,
-      })
-    )
-    if (!shouldProceed) {
-      return
-    }
-  }
   try {
     emit('production', props.job.id, productionInput.value)
     productionInput.value = null
@@ -101,6 +87,10 @@ function formatHistoryEntry(delta: number, createdAt: string) {
         <div>
           <span class="label">{{ t('jobs.partsProduced') }}</span>
           <strong>{{ job.parts_produced }}</strong>
+        </div>
+        <div v-if="partsOverproduced > 0" class="overproduced">
+          <span class="label">{{ t('jobs.partsOverproduced') }}</span>
+          <strong>{{ partsOverproduced }}</strong>
         </div>
         <div>
           <span class="label">{{ t('jobs.partsRemaining') }}</span>
@@ -221,6 +211,18 @@ function formatHistoryEntry(delta: number, createdAt: string) {
   display: block;
   font-size: 20px;
   margin-top: 6px;
+}
+
+.stats .overproduced {
+  color: #2563eb;
+}
+
+.stats .overproduced .label {
+  color: #2563eb;
+}
+
+.stats .overproduced strong {
+  color: #2563eb;
 }
 
 .production-form .help {
