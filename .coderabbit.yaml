@@ -126,10 +126,6 @@ reviews:
       enabled: true
       config_file: "eslint.config.ts"
 
-    # TypeScript type checking
-    typescript:
-      enabled: true
-
 # Configure chat settings
 chat:
   enabled: true
@@ -165,38 +161,3 @@ code_generation:
       - path: "src/**/*.{ts,vue}"
         instructions: "Generate unit tests for TypeScript functions and Vue components."
 
-# Additional review guidelines
-guidelines:
-  # Code quality
-  - "Follow Vue 3 Composition API best practices"
-  - "Use TypeScript for type safety"
-  - "Keep components small and focused"
-  - "Use computed properties for derived state"
-  - "Avoid unnecessary re-renders"
-
-  # Security
-  - "Never expose Supabase keys in client code"
-  - "Use Row Level Security (RLS) policies"
-  - "Validate user input"
-  - "Sanitize data before rendering"
-  - "Check for XSS vulnerabilities"
-
-  # Performance
-  - "Use lazy loading for routes"
-  - "Optimize images and assets"
-  - "Avoid unnecessary API calls"
-  - "Use pagination for large lists"
-  - "Optimize reactive updates"
-
-  # Accessibility
-  - "Use semantic HTML elements"
-  - "Add ARIA labels where needed"
-  - "Ensure keyboard navigation works"
-  - "Provide alternative text for images"
-  - "Ensure proper color contrast"
-
-  # i18n
-  - "Keep translation keys consistent"
-  - "Provide translations for all languages (en, bg, uk)"
-  - "Use translation keys, not hardcoded strings"
-  - "Keep translations short and clear"
