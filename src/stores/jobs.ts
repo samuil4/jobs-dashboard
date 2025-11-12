@@ -39,7 +39,7 @@ export const useJobsStore = defineStore('jobs', () => {
     error.value = null
     const { data, error: fetchError } = await supabase
       .from('jobs')
-      .select('id, name, parts_needed, parts_produced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -66,13 +66,14 @@ export const useJobsStore = defineStore('jobs', () => {
         name: payload.name,
         parts_needed: payload.partsNeeded,
         parts_produced: 0,
+        parts_overproduced: 0,
         archived: false,
         status: 'active',
         assignee: payload.assignee,
         created_at: now,
         updated_at: now,
       })
-      .select('id, name, parts_needed, parts_produced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (insertError) {
@@ -89,20 +90,41 @@ export const useJobsStore = defineStore('jobs', () => {
     const job = jobs.value.find((j) => j.id === id)
     if (!job) return
 
+    // Calculate current total production
+    const currentTotal = job.parts_produced + (job.parts_overproduced ?? 0)
+
+    // Recalculate parts_produced and parts_overproduced based on new parts_needed
+    let newPartsProduced: number
+    let newPartsOverproduced: number
+
+    if (payload.partsNeeded >= currentTotal) {
+      // New parts_needed is greater than or equal to current total
+      // All production counts as requested production
+      newPartsProduced = currentTotal
+      newPartsOverproduced = 0
+    } else {
+      // New parts_needed is less than current total
+      // Cap parts_produced at new parts_needed, rest goes to overproduction
+      newPartsProduced = payload.partsNeeded
+      newPartsOverproduced = currentTotal - payload.partsNeeded
+    }
+
     const newStatus =
-      job.parts_produced >= payload.partsNeeded ? ('completed' as const) : ('active' as const)
+      newPartsProduced >= payload.partsNeeded ? ('completed' as const) : ('active' as const)
 
     const { data, error: updateError } = await supabase
       .from('jobs')
       .update({
         name: payload.name,
         parts_needed: payload.partsNeeded,
+        parts_produced: newPartsProduced,
+        parts_overproduced: newPartsOverproduced,
         assignee: payload.assignee,
         status: job.archived ? 'archived' : newStatus,
         updated_at: formatISO(new Date()),
       })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -133,7 +155,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: formatISO(new Date()),
       })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -166,20 +188,27 @@ export const useJobsStore = defineStore('jobs', () => {
       throw new Error('Delta must be positive')
     }
 
-    const remainingBefore = Math.max(job.parts_needed - job.parts_produced, 0)
-    const appliedDelta = Math.min(delta, remainingBefore)
-    if (appliedDelta <= 0) {
-      return
-    }
-    const targetTotal = job.parts_produced + appliedDelta
-    const cappedTotal = Math.min(targetTotal, job.parts_needed)
-    const status = cappedTotal >= job.parts_needed ? ('completed' as const) : ('active' as const)
+    // Calculate current total production (including overproduction)
+    const currentTotalProduced = job.parts_produced + (job.parts_overproduced ?? 0)
+
+    // Calculate new total after adding delta
+    const newTotalProduced = currentTotalProduced + delta
+
+    // Calculate new parts_produced (capped at parts_needed)
+    const newPartsProduced = Math.min(newTotalProduced, job.parts_needed)
+
+    // Calculate new parts_overproduced (excess beyond parts_needed)
+    const newPartsOverproduced = Math.max(0, newTotalProduced - job.parts_needed)
+
+    // Determine status based on parts_produced
+    const status = newPartsProduced >= job.parts_needed ? ('completed' as const) : ('active' as const)
     const now = formatISO(new Date())
 
     const { error: jobUpdateError } = await supabase
       .from('jobs')
       .update({
-        parts_produced: cappedTotal,
+        parts_produced: newPartsProduced,
+        parts_overproduced: newPartsOverproduced,
         status: job.archived ? 'archived' : status,
         updated_at: now,
       })
@@ -190,11 +219,12 @@ export const useJobsStore = defineStore('jobs', () => {
       throw jobUpdateError
     }
 
+    // Store the full delta in history (including overproduction)
     const { data: historyInsert, error: historyError } = await supabase
       .from('job_updates')
       .insert({
         job_id: id,
-        delta: appliedDelta,
+        delta: delta,
         updated_by: updatedBy ?? null,
         created_at: now,
       })
@@ -212,7 +242,8 @@ export const useJobsStore = defineStore('jobs', () => {
       if (item.id !== id) return item
       return {
         ...item,
-        parts_produced: cappedTotal,
+        parts_produced: newPartsProduced,
+        parts_overproduced: newPartsOverproduced,
         status: job.archived ? 'archived' : status,
         updated_at: now,
         job_updates: [newHistoryRecord, ...item.job_updates],
@@ -251,6 +282,169 @@ export const useJobsStore = defineStore('jobs', () => {
     showArchived.value = !showArchived.value
   }
 
+  function recalculateJobProduction(
+    historyEntries: JobUpdateRecord[],
+    job: JobRecord
+  ): {
+    parts_produced: number
+    parts_overproduced: number
+    status: 'active' | 'completed' | 'archived'
+  } {
+    // Sum all deltas from history entries
+    // If no history entries, total is 0
+    const totalProduced = historyEntries.reduce((sum, entry) => sum + entry.delta, 0)
+
+    // Calculate parts_produced (capped at parts_needed)
+    // This represents the requested parts that have been produced
+    const newPartsProduced = Math.min(totalProduced, job.parts_needed)
+
+    // Calculate parts_overproduced (excess beyond parts_needed)
+    // This represents extra parts produced beyond what was requested
+    const newPartsOverproduced = Math.max(0, totalProduced - job.parts_needed)
+
+    // Determine status based on production vs needed
+    // If job is archived, preserve archived status
+    // If parts_produced >= parts_needed, job is completed
+    // Otherwise, job is active
+    const newStatus = job.archived
+      ? ('archived' as const)
+      : newPartsProduced >= job.parts_needed
+        ? ('completed' as const)
+        : ('active' as const)
+
+    return {
+      parts_produced: newPartsProduced,
+      parts_overproduced: newPartsOverproduced,
+      status: newStatus,
+    }
+  }
+
+  async function deleteHistoryItem(jobId: string, historyId: string) {
+    error.value = null
+    const job = jobs.value.find((j) => j.id === jobId)
+    if (!job) {
+      throw new Error('Job not found')
+    }
+
+    // Delete the history entry from database
+    const { error: deleteError } = await supabase.from('job_updates').delete().eq('id', historyId)
+
+    if (deleteError) {
+      error.value = deleteError.message
+      throw deleteError
+    }
+
+    // Fetch all remaining history entries for the job
+    const { data: remainingHistory, error: fetchError } = await supabase
+      .from('job_updates')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false })
+
+    if (fetchError) {
+      error.value = fetchError.message
+      throw fetchError
+    }
+
+    const historyEntries = (remainingHistory ?? []) as JobUpdateRecord[]
+
+    // Recalculate production totals
+    const recalculated = recalculateJobProduction(historyEntries, job)
+
+    // Update job record in database
+    const now = formatISO(new Date())
+    const { data: updatedJob, error: updateError } = await supabase
+      .from('jobs')
+      .update({
+        parts_produced: recalculated.parts_produced,
+        parts_overproduced: recalculated.parts_overproduced,
+        status: recalculated.status,
+        updated_at: now,
+      })
+      .eq('id', jobId)
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .single()
+
+    if (updateError) {
+      error.value = updateError.message
+      throw updateError
+    }
+
+    // Update local state
+    const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    jobs.value = jobs.value.map((item) =>
+      item.id === jobId ? withHistory(rest, job_updates) : item
+    )
+  }
+
+  async function updateHistoryItem(jobId: string, historyId: string, newDelta: number) {
+    error.value = null
+
+    if (newDelta <= 0) {
+      throw new Error('Delta must be positive')
+    }
+
+    const job = jobs.value.find((j) => j.id === jobId)
+    if (!job) {
+      throw new Error('Job not found')
+    }
+
+    // Update the history entry in database
+    const { error: updateError } = await supabase
+      .from('job_updates')
+      .update({
+        delta: newDelta,
+      })
+      .eq('id', historyId)
+
+    if (updateError) {
+      error.value = updateError.message
+      throw updateError
+    }
+
+    // Fetch all history entries for the job (including updated one)
+    const { data: allHistory, error: fetchError } = await supabase
+      .from('job_updates')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false })
+
+    if (fetchError) {
+      error.value = fetchError.message
+      throw fetchError
+    }
+
+    const historyEntries = (allHistory ?? []) as JobUpdateRecord[]
+
+    // Recalculate production totals
+    const recalculated = recalculateJobProduction(historyEntries, job)
+
+    // Update job record in database
+    const now = formatISO(new Date())
+    const { data: updatedJob, error: jobUpdateError } = await supabase
+      .from('jobs')
+      .update({
+        parts_produced: recalculated.parts_produced,
+        parts_overproduced: recalculated.parts_overproduced,
+        status: recalculated.status,
+        updated_at: now,
+      })
+      .eq('id', jobId)
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .single()
+
+    if (jobUpdateError) {
+      error.value = jobUpdateError.message
+      throw jobUpdateError
+    }
+
+    // Update local state
+    const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    jobs.value = jobs.value.map((item) =>
+      item.id === jobId ? withHistory(rest, job_updates) : item
+    )
+  }
+
   return {
     jobs,
     loading,
@@ -265,6 +459,8 @@ export const useJobsStore = defineStore('jobs', () => {
     archiveJob,
     deleteJob,
     addProduction,
+    deleteHistoryItem,
+    updateHistoryItem,
     setSearch,
     setStatus,
     toggleArchivedVisibility,

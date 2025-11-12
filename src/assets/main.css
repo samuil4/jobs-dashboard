@@ -36,8 +36,9 @@ button {
   flex: 1 1 auto;
   width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 72px 24px 64px;
   max-width: 1200px;
+  min-height: calc(100vh - 56px - 48px);
 }
 
 .card {
@@ -87,6 +88,17 @@ button {
 .btn-ghost {
   background: transparent;
   color: inherit;
+}
+
+.btn-compact {
+  height: 32px;
+  padding: 6px 12px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.btn-compact:hover {
+  transform: none;
 }
 
 .badge {

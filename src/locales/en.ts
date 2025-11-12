@@ -25,12 +25,13 @@ export default {
   },
   jobs: {
     heading: 'Manufacturing jobs',
-    addJob: 'Add job',
-    editJob: 'Edit job',
-    jobName: 'Job name',
-    partsNeeded: 'Parts needed',
-    partsProduced: 'Parts produced',
-    partsRemaining: 'Parts remaining',
+    addJob: 'Add',
+    editJob: 'Edit',
+    jobName: 'Name',
+    partsNeeded: 'Needed',
+    partsProduced: 'DONE',
+    partsOverproduced: 'Over',
+    partsRemaining: 'Left',
     dateAdded: 'Date added',
     assignee: 'Assignee',
     assignees: {
@@ -50,7 +51,7 @@ export default {
     updateProduction: 'Add production',
     productionDelta: 'Produced quantity',
     deltaHelp:
-      'Enter how many additional parts were produced. The total production will be updated and recorded in history.',
+      'Enter how many additional parts were produced. Overproduction beyond requested amount will be tracked separately and recorded in history.',
     filter: {
       showArchived: 'Show archived',
       hideArchived: 'Hide archived',
@@ -65,6 +66,14 @@ export default {
       title: 'Production history',
       empty: 'No updates yet',
       entry: '{quantity} added on {date}',
+      edit: 'Edit',
+      delete: 'Delete',
+      editTitle: 'Edit History Entry',
+      deleteTitle: 'Delete History Entry',
+      deleteMessage: 'Delete {quantity} parts from "{jobName}"? This will recalculate production totals.',
+      deltaLabel: 'Quantity',
+      save: 'Save',
+      cancel: 'Cancel',
     },
     deleteModal: {
       title: 'Delete job',

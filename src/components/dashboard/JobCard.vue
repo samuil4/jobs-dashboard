@@ -14,6 +14,8 @@ const emit = defineEmits<{
   (e: 'archive', jobId: string, archived: boolean): void
   (e: 'delete', jobId: string): void
   (e: 'production', jobId: string, delta: number): void
+  (e: 'editHistory', jobId: string, historyId: string, currentDelta: number): void
+  (e: 'deleteHistory', jobId: string, historyId: string): void
 }>()
 
 const { t } = useI18n()
@@ -23,6 +25,8 @@ const localError = ref<string | null>(null)
 const partsRemaining = computed(() =>
   Math.max(props.job.parts_needed - props.job.parts_produced, 0)
 )
+
+const partsOverproduced = computed(() => props.job.parts_overproduced ?? 0)
 
 const statusBadgeClass = computed(() => {
   switch (props.job.status) {
@@ -42,22 +46,6 @@ async function handleProductionSubmit() {
     return
   }
 
-  if (partsRemaining.value <= 0) {
-    localError.value = t('jobs.alreadyCompleted')
-    return
-  }
-
-  if (partsRemaining.value > 0 && productionInput.value > partsRemaining.value) {
-    const shouldProceed = confirm(
-      t('jobs.confirmOverProduction', {
-        remaining: partsRemaining.value,
-        added: productionInput.value,
-      })
-    )
-    if (!shouldProceed) {
-      return
-    }
-  }
   try {
     emit('production', props.job.id, productionInput.value)
     productionInput.value = null
@@ -94,34 +82,40 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 
     <section class="job-body">
       <div class="stats">
-        <div>
-          <span class="label">{{ t('jobs.partsNeeded') }}</span>
+        <div class="stat-item">
+          <span class="label">{{ t('jobs.partsNeeded') }}:</span>
           <strong>{{ job.parts_needed }}</strong>
         </div>
-        <div>
-          <span class="label">{{ t('jobs.partsProduced') }}</span>
+        <div class="stat-item">
+          <span class="label">{{ t('jobs.partsProduced') }}:</span>
           <strong>{{ job.parts_produced }}</strong>
         </div>
-        <div>
-          <span class="label">{{ t('jobs.partsRemaining') }}</span>
+        <div class="stat-item">
+          <span class="label">{{ t('jobs.partsRemaining') }}:</span>
           <strong>{{ partsRemaining }}</strong>
+        </div>
+        <div v-if="partsOverproduced > 0" class="stat-item overproduced">
+          <span class="label">{{ t('jobs.partsOverproduced') }}:</span>
+          <strong>{{ partsOverproduced }}</strong>
         </div>
       </div>
 
       <form class="production-form" @submit.prevent="handleProductionSubmit">
-        <label :for="`production-${job.id}`">{{ t('jobs.productionDelta') }}</label>
-        <input
-          :id="`production-${job.id}`"
-          v-model.number="productionInput"
-          type="number"
-          min="1"
-          :placeholder="t('jobs.deltaHelp')"
-        />
-        <p class="help">{{ t('jobs.deltaHelp') }}</p>
+        <div class="production-form-row">
+          <input
+            :id="`production-${job.id}`"
+            v-model.number="productionInput"
+            type="number"
+            min="1"
+            :placeholder="t('jobs.updateProduction')"
+            :aria-label="t('jobs.updateProduction')"
+            class="production-input"
+          />
+          <button class="btn btn-primary" type="submit">
+            {{ t('jobs.updateProduction') }}
+          </button>
+        </div>
         <p v-if="localError" class="error">{{ localError }}</p>
-        <button class="btn btn-primary" type="submit">
-          {{ t('jobs.updateProduction') }}
-        </button>
       </form>
     </section>
 
@@ -132,8 +126,26 @@ function formatHistoryEntry(delta: number, createdAt: string) {
           {{ t('jobs.history.empty') }}
         </div>
         <ul v-else>
-          <li v-for="update in job.job_updates" :key="update.id">
-            {{ formatHistoryEntry(update.delta, update.created_at) }}
+          <li v-for="update in job.job_updates" :key="update.id" class="history-item">
+            <span class="history-entry">{{ formatHistoryEntry(update.delta, update.created_at) }}</span>
+            <div class="history-actions">
+              <button
+                class="btn-icon"
+                type="button"
+                :title="t('jobs.history.edit')"
+                @click="emit('editHistory', job.id, update.id, update.delta)"
+              >
+                {{ t('jobs.history.edit') }}
+              </button>
+              <button
+                class="btn-icon btn-icon-danger"
+                type="button"
+                :title="t('jobs.history.delete')"
+                @click="emit('deleteHistory', job.id, update.id)"
+              >
+                {{ t('jobs.history.delete') }}
+              </button>
+            </div>
           </li>
         </ul>
       </div>
@@ -204,35 +216,81 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 }
 
 .stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
   margin-bottom: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.label {
-  font-size: 12px;
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.stat-item .label {
+  font-size: 13px;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
-.stats strong {
-  display: block;
-  font-size: 20px;
-  margin-top: 6px;
+.stat-item strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
 }
 
-.production-form .help {
-  font-size: 12px;
-  margin: 4px 0 8px;
-  color: #6b7280;
+.stat-item.overproduced {
+  color: #2563eb;
+}
+
+.stat-item.overproduced .label {
+  color: #2563eb;
+}
+
+.stat-item.overproduced strong {
+  color: #2563eb;
+}
+
+.production-form {
+  margin-top: 12px;
+}
+
+.production-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.production-input {
+  flex: 1;
+  min-width: 100px;
+  height: 36px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  margin: 0;
+  width: auto;
+}
+
+.production-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .production-form .error {
   color: #dc2626;
   font-size: 12px;
-  margin: 0 0 8px;
+  margin: 8px 0 0;
 }
 
 .history {
@@ -255,14 +313,65 @@ function formatHistoryEntry(delta: number, createdAt: string) {
   padding: 12px;
 }
 
-.history li {
-  padding: 6px 0;
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(107, 114, 128, 0.2);
   font-size: 13px;
 }
 
-.history li:last-child {
+.history-item:last-child {
   border-bottom: none;
+}
+
+.history-entry {
+  flex: 1;
+}
+
+.history-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.history-item:hover .history-actions {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .history-actions {
+    opacity: 1;
+  }
+}
+
+.btn-icon {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-icon-danger {
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.btn-icon-danger:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
 }
 
 .history-empty {
@@ -298,6 +407,33 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 
   .actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .stats {
+    gap: 12px 16px;
+  }
+
+  .stat-item {
+    font-size: 12px;
+  }
+
+  .stat-item .label {
+    font-size: 12px;
+  }
+
+  .stat-item strong {
+    font-size: 14px;
+  }
+
+  .production-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .production-input {
+    width: 100%;
   }
 }
 </style>

@@ -25,12 +25,13 @@ export default {
   },
   jobs: {
     heading: 'Виробничі завдання',
-    addJob: 'Нове завдання',
+    addJob: 'Нове',
     editJob: 'Редагувати',
-    jobName: 'Назва завдання',
-    partsNeeded: 'Потрібно деталей',
-    partsProduced: 'Вироблено деталей',
-    partsRemaining: 'Залишилося деталей',
+    jobName: 'Назва',
+    partsNeeded: 'Потрібно',
+    partsProduced: 'ГОТОВО',
+    partsOverproduced: 'Над',
+    partsRemaining: 'Залиш.',
     dateAdded: 'Дата створення',
     assignee: 'Відповідальний',
     assignees: {
@@ -50,7 +51,7 @@ export default {
     updateProduction: 'Додати виробництво',
     productionDelta: 'Скільки додано',
     deltaHelp:
-      'Вкажіть, скільки додаткових деталей виготовлено. Загальний показник оновиться та потрапить в історію.',
+      'Вкажіть, скільки додаткових деталей виготовлено. Перевиробництво понад необхідну кількість відстежуватиметься окремо та потрапить в історію.',
     filter: {
       showArchived: 'Показати архівні',
       hideArchived: 'Приховати архівні',
@@ -65,6 +66,14 @@ export default {
       title: 'Історія виробництва',
       empty: 'Немає записів',
       entry: 'Додано {quantity} {date}',
+      edit: 'Редагувати',
+      delete: 'Видалити',
+      editTitle: 'Редагувати запис',
+      deleteTitle: 'Видалити запис',
+      deleteMessage: 'Видалити {quantity} деталей з «{jobName}»? Це перерахує загальне виробництво.',
+      deltaLabel: 'Кількість',
+      save: 'Зберегти',
+      cancel: 'Скасувати',
     },
     deleteModal: {
       title: 'Видалення завдання',
