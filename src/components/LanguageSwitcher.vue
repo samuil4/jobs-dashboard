@@ -30,7 +30,25 @@ const modelValue = computed({
 
 <style scoped>
 .language-switcher {
-  min-width: 160px;
+  min-width: 120px;
+}
+
+.language-switcher select {
+  height: 32px;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  width: 100%;
+  margin: 0;
+}
+
+.language-switcher select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .visually-hidden {

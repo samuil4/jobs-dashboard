@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, inject, onMounted, reactive, ref, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
@@ -15,8 +15,7 @@ const jobsStore = useJobsStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
 
-const { filteredJobs, loading, error, showArchived, statusFilter, searchTerm } =
-  storeToRefs(jobsStore)
+const { filteredJobs, loading, error } = storeToRefs(jobsStore)
 
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
@@ -65,6 +64,12 @@ function openCreateModal() {
   modalMode.value = 'create'
   editingJobId.value = null
   showModal.value = true
+}
+
+// Inject and set openCreateModal function ref from App.vue
+const openCreateModalRef = inject<Ref<(() => void) | null>>('openCreateModal')
+if (openCreateModalRef) {
+  openCreateModalRef.value = openCreateModal
 }
 
 function openEditModal(jobId: string) {
@@ -203,9 +208,6 @@ async function confirmDeleteHistory() {
   }
 }
 
-const archivedToggleLabel = computed(() =>
-  showArchived.value ? t('jobs.filter.hideArchived') : t('jobs.filter.showArchived')
-)
 
 const archiveModalTitle = computed(() =>
   archiveModal.action === 'archive'
@@ -226,39 +228,6 @@ const archiveConfirmLabel = computed(() =>
 
 <template>
   <section class="dashboard">
-    <header class="dashboard-header">
-      <div>
-        <h1>{{ t('jobs.heading') }}</h1>
-        <p class="subtitle">
-          {{ t('navigation.dashboard') }}
-        </p>
-      </div>
-      <button class="btn btn-primary" type="button" @click="openCreateModal">
-        {{ t('jobs.addJob') }}
-      </button>
-    </header>
-
-    <div class="filters card">
-      <div class="filter-group">
-        <label for="search">{{ t('jobs.filter.search') }}</label>
-        <input id="search" v-model="searchTerm" type="search" :placeholder="t('jobs.filter.search')" />
-      </div>
-      <div class="filter-group">
-        <label for="status-filter">{{ t('jobs.filter.status') }}</label>
-        <select id="status-filter" v-model="statusFilter">
-          <option value="all">{{ t('jobs.filter.all') }}</option>
-          <option value="active">{{ t('jobs.filter.active') }}</option>
-          <option value="completed">{{ t('jobs.filter.completed') }}</option>
-          <option value="archived">{{ t('jobs.filter.archived') }}</option>
-        </select>
-      </div>
-      <div class="filter-group toggle">
-        <label>{{ t('navigation.archived') }}</label>
-        <button class="btn btn-secondary" type="button" @click="jobsStore.toggleArchivedVisibility">
-          {{ archivedToggleLabel }}
-        </button>
-      </div>
-    </div>
 
     <div v-if="loading" class="card state">
       {{ t('common.loading') }}…
@@ -340,41 +309,7 @@ const archiveConfirmLabel = computed(() =>
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.dashboard-header h1 {
-  margin: 0 0 6px;
-  font-size: 32px;
-}
-
-.subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
-  align-items: end;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.filter-group.toggle {
-  align-items: flex-start;
+  gap: 20px;
 }
 
 .state {
@@ -391,13 +326,6 @@ const archiveConfirmLabel = computed(() =>
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-}
-
-@media (max-width: 640px) {
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
 </style>
 
