@@ -1,0 +1,202 @@
+# CodeRabbit Configuration
+# https://docs.coderabbit.ai/reference/configuration/
+
+# Set the language for CodeRabbit's responses
+language: en-US
+
+# Define the tone of CodeRabbit's comments
+tone_instructions: "Provide feedback in a constructive and friendly manner. Focus on Vue 3 Composition API best practices, TypeScript type safety, and code quality."
+
+# Configure review settings
+reviews:
+  # Enable automatic reviews
+  automatic: true
+
+  # Set the review profile: 'chill' for less strict reviews or 'assertive' for more strict reviews
+  profile: chill
+
+  # Specify path filters to include or exclude files from reviews
+  path_filters:
+    # Exclude build artifacts and dependencies
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    - "!**/package-lock.json"
+    - "!**/.git/**"
+    - "!**/.vscode/**"
+    - "!**/.idea/**"
+    # Include source files
+    - "src/**/*.{vue,ts,js}"
+    - "*.{ts,js,json}"
+    - "*.config.{ts,js}"
+
+  # Provide specific instructions for certain file paths
+  path_instructions:
+    # Vue component files
+    - path: "src/components/**/*.vue"
+      instructions: |
+        Review Vue 3 components for best practices:
+        - Use Composition API with <script setup>
+        - Properly define props and emits with TypeScript
+        - Use computed properties for derived state
+        - Ensure accessibility (ARIA labels, semantic HTML)
+        - Check for reactivity issues
+        - Keep components focused and small
+        - Use proper event handling
+
+    # Store files (Pinia)
+    - path: "src/stores/**/*.ts"
+      instructions: |
+        Review Pinia store files for:
+        - Type safety with TypeScript
+        - Proper state management patterns
+        - Reactive state handling
+        - Action and getter best practices
+        - Error handling
+
+    # Router files
+    - path: "src/router/**/*.ts"
+      instructions: |
+        Review Vue Router configuration for:
+        - Route definitions and navigation guards
+        - Authentication checks
+        - Route meta fields
+        - Lazy loading for routes
+
+    # Type definition files
+    - path: "src/types/**/*.ts"
+      instructions: |
+        Review TypeScript type definitions for:
+        - Proper type definitions and interfaces
+        - Type safety and avoiding 'any' types
+        - Generic types where appropriate
+        - Consistency with backend types
+
+    # Locale files (i18n)
+    - path: "src/locales/**/*.ts"
+      instructions: |
+        Review i18n locale files for:
+        - Consistent translation key structure
+        - Complete translations for all languages
+        - Short and clear translation strings
+        - Proper key organization
+
+    # View files
+    - path: "src/views/**/*.vue"
+      instructions: |
+        Review Vue view components for:
+        - Page-level component structure
+        - Data fetching and loading states
+        - Error handling
+        - User experience considerations
+
+    # TypeScript and JavaScript files
+    - path: "src/**/*.{ts,js}"
+      instructions: |
+        Review TypeScript and JavaScript code for:
+        - Type safety and proper TypeScript usage
+        - Best practices and code quality
+        - Security vulnerabilities (SQL injection, XSS, etc.)
+        - Performance optimizations
+        - Error handling
+        - Avoid 'any' types where possible
+
+    # Configuration files
+    - path: "*.config.{ts,js}"
+      instructions: |
+        Review configuration files for:
+        - Proper configuration structure
+        - Security settings
+        - Build optimization
+
+    # Supabase related files
+    - path: "src/lib/supabase.ts"
+      instructions: |
+        Review Supabase client configuration for:
+        - Security best practices
+        - Proper environment variable usage
+        - Client initialization
+        - No exposed secrets or keys
+
+  # Configure tools for code analysis
+  tools:
+    # ESLint integration
+    eslint:
+      enabled: true
+      config_file: "eslint.config.ts"
+
+    # TypeScript type checking
+    typescript:
+      enabled: true
+
+# Configure chat settings
+chat:
+  enabled: true
+  instructions: |
+    Assist with code-related questions and provide explanations for CodeRabbit's feedback.
+    Focus on:
+    - Vue 3 Composition API and best practices
+    - TypeScript type safety
+    - Pinia state management
+    - Vue Router navigation
+    - Supabase integration and security
+    - i18n implementation
+    - Accessibility best practices
+
+# Configure knowledge base settings
+knowledge_base:
+  enabled: true
+  retention: 30  # Retain knowledge for 30 days
+
+# Configure code generation settings
+code_generation:
+  # Docstring generation (if needed)
+  docstrings:
+    enabled: false
+    path_instructions:
+      - path: "src/**/*.{ts,vue}"
+        instructions: "Generate JSDoc comments for TypeScript functions and Vue component methods."
+
+  # Unit test generation (if needed)
+  unit_tests:
+    enabled: false
+    path_instructions:
+      - path: "src/**/*.{ts,vue}"
+        instructions: "Generate unit tests for TypeScript functions and Vue components."
+
+# Additional review guidelines
+guidelines:
+  # Code quality
+  - "Follow Vue 3 Composition API best practices"
+  - "Use TypeScript for type safety"
+  - "Keep components small and focused"
+  - "Use computed properties for derived state"
+  - "Avoid unnecessary re-renders"
+
+  # Security
+  - "Never expose Supabase keys in client code"
+  - "Use Row Level Security (RLS) policies"
+  - "Validate user input"
+  - "Sanitize data before rendering"
+  - "Check for XSS vulnerabilities"
+
+  # Performance
+  - "Use lazy loading for routes"
+  - "Optimize images and assets"
+  - "Avoid unnecessary API calls"
+  - "Use pagination for large lists"
+  - "Optimize reactive updates"
+
+  # Accessibility
+  - "Use semantic HTML elements"
+  - "Add ARIA labels where needed"
+  - "Ensure keyboard navigation works"
+  - "Provide alternative text for images"
+  - "Ensure proper color contrast"
+
+  # i18n
+  - "Keep translation keys consistent"
+  - "Provide translations for all languages (en, bg, uk)"
+  - "Use translation keys, not hardcoded strings"
+  - "Keep translations short and clear"
