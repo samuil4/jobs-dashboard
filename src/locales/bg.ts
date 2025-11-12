@@ -29,9 +29,9 @@ export default {
     editJob: 'Редакция',
     jobName: 'Име',
     partsNeeded: 'Необходими',
-    partsProduced: 'Произведени',
-    partsOverproduced: 'Надпроизведени',
-    partsRemaining: 'Оставащи',
+    partsProduced: 'ГОТОВО',
+    partsOverproduced: 'Над',
+    partsRemaining: 'Ост.',
     dateAdded: 'Дата на създаване',
     assignee: 'Отговорник',
     assignees: {

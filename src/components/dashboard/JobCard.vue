@@ -82,38 +82,40 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 
     <section class="job-body">
       <div class="stats">
-        <div>
-          <span class="label">{{ t('jobs.partsNeeded') }}</span>
+        <div class="stat-item">
+          <span class="label">{{ t('jobs.partsNeeded') }}:</span>
           <strong>{{ job.parts_needed }}</strong>
         </div>
-        <div>
-          <span class="label">{{ t('jobs.partsProduced') }}</span>
+        <div class="stat-item">
+          <span class="label">{{ t('jobs.partsProduced') }}:</span>
           <strong>{{ job.parts_produced }}</strong>
         </div>
-        <div v-if="partsOverproduced > 0" class="overproduced">
-          <span class="label">{{ t('jobs.partsOverproduced') }}</span>
-          <strong>{{ partsOverproduced }}</strong>
-        </div>
-        <div>
-          <span class="label">{{ t('jobs.partsRemaining') }}</span>
+        <div class="stat-item">
+          <span class="label">{{ t('jobs.partsRemaining') }}:</span>
           <strong>{{ partsRemaining }}</strong>
+        </div>
+        <div v-if="partsOverproduced > 0" class="stat-item overproduced">
+          <span class="label">{{ t('jobs.partsOverproduced') }}:</span>
+          <strong>{{ partsOverproduced }}</strong>
         </div>
       </div>
 
       <form class="production-form" @submit.prevent="handleProductionSubmit">
-        <label :for="`production-${job.id}`">{{ t('jobs.productionDelta') }}</label>
-        <input
-          :id="`production-${job.id}`"
-          v-model.number="productionInput"
-          type="number"
-          min="1"
-          :placeholder="t('jobs.deltaHelp')"
-        />
-        <p class="help">{{ t('jobs.deltaHelp') }}</p>
+        <div class="production-form-row">
+          <input
+            :id="`production-${job.id}`"
+            v-model.number="productionInput"
+            type="number"
+            min="1"
+            :placeholder="t('jobs.updateProduction')"
+            :aria-label="t('jobs.updateProduction')"
+            class="production-input"
+          />
+          <button class="btn btn-primary" type="submit">
+            {{ t('jobs.updateProduction') }}
+          </button>
+        </div>
         <p v-if="localError" class="error">{{ localError }}</p>
-        <button class="btn btn-primary" type="submit">
-          {{ t('jobs.updateProduction') }}
-        </button>
       </form>
     </section>
 
@@ -214,47 +216,81 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 }
 
 .stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
   margin-bottom: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.label {
-  font-size: 12px;
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.stat-item .label {
+  font-size: 13px;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
-.stats strong {
-  display: block;
-  font-size: 20px;
-  margin-top: 6px;
+.stat-item strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
 }
 
-.stats .overproduced {
+.stat-item.overproduced {
   color: #2563eb;
 }
 
-.stats .overproduced .label {
+.stat-item.overproduced .label {
   color: #2563eb;
 }
 
-.stats .overproduced strong {
+.stat-item.overproduced strong {
   color: #2563eb;
 }
 
-.production-form .help {
-  font-size: 12px;
-  margin: 4px 0 8px;
-  color: #6b7280;
+.production-form {
+  margin-top: 12px;
+}
+
+.production-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.production-input {
+  flex: 1;
+  min-width: 100px;
+  height: 36px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  margin: 0;
+  width: auto;
+}
+
+.production-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .production-form .error {
   color: #dc2626;
   font-size: 12px;
-  margin: 0 0 8px;
+  margin: 8px 0 0;
 }
 
 .history {
@@ -371,6 +407,33 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 
   .actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .stats {
+    gap: 12px 16px;
+  }
+
+  .stat-item {
+    font-size: 12px;
+  }
+
+  .stat-item .label {
+    font-size: 12px;
+  }
+
+  .stat-item strong {
+    font-size: 14px;
+  }
+
+  .production-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .production-input {
+    width: 100%;
   }
 }
 </style>

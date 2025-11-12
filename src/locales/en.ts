@@ -29,9 +29,9 @@ export default {
     editJob: 'Edit',
     jobName: 'Name',
     partsNeeded: 'Needed',
-    partsProduced: 'Produced',
-    partsOverproduced: 'Overproduced',
-    partsRemaining: 'Remaining',
+    partsProduced: 'DONE',
+    partsOverproduced: 'Over',
+    partsRemaining: 'Left',
     dateAdded: 'Date added',
     assignee: 'Assignee',
     assignees: {
