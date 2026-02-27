@@ -44,6 +44,7 @@ create table public.job_updates (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references public.jobs(id) on delete cascade,
   delta integer not null,
+  update_type text not null default 'production' check (update_type in ('production','delivery')),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
@@ -90,7 +91,17 @@ COMMENT ON COLUMN public.jobs.notes IS 'Optional notes for the job';
 COMMENT ON COLUMN public.jobs.delivered IS 'Number of parts delivered';
 ```
 
-Note: If you're creating a new database, the `parts_overproduced`, `notes`, and `delivered` columns are already included in the table creation SQL above.
+2.3. If you have an existing database (created before delivery history support was added), run this migration:
+
+```sql
+ALTER TABLE public.job_updates
+ADD COLUMN update_type TEXT NOT NULL DEFAULT 'production'
+  CHECK (update_type IN ('production','delivery'));
+
+COMMENT ON COLUMN public.job_updates.update_type IS 'production = parts produced, delivery = parts delivered';
+```
+
+Note: If you're creating a new database, the `parts_overproduced`, `notes`, `delivered`, and `update_type` columns are already included in the table creation SQL above.
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
 

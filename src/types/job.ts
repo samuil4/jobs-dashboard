@@ -21,10 +21,13 @@ export interface JobWithHistory extends JobRecord {
   job_updates: JobUpdateRecord[]
 }
 
+export type UpdateType = 'production' | 'delivery'
+
 export interface JobUpdateRecord {
   id: string
   job_id: string
   delta: number
+  update_type?: UpdateType
   created_at: string
   updated_by?: string | null
   note?: string | null

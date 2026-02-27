@@ -52,6 +52,7 @@ export default {
     unarchive: 'Unarchive',
     delete: 'Delete',
     updateProduction: 'Add production',
+    addDelivery: 'Add delivery',
     productionDelta: 'Produced quantity',
     deltaHelp:
       'Enter how many additional parts were produced. Overproduction beyond requested amount will be tracked separately and recorded in history.',
@@ -69,6 +70,7 @@ export default {
       title: 'Production history',
       empty: 'No updates yet',
       entry: '{quantity} added on {date}',
+      entryDelivered: '{quantity} delivered on {date}',
       edit: 'Edit',
       delete: 'Delete',
       editTitle: 'Edit History Entry',

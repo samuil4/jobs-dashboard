@@ -162,12 +162,12 @@ async function handleUpdateNotes(jobId: string, notes: string | null) {
   }
 }
 
-async function handleUpdateDelivered(jobId: string, delivered: number) {
+async function handleDelivery(jobId: string, delta: number) {
   try {
-    await jobsStore.updateJobDelivered(jobId, delivered)
+    await jobsStore.addDelivery(jobId, delta, authStore.userId)
   } catch (err) {
     console.error(err)
-    alert(t('errors.updateJob'))
+    alert(t('errors.updateProduction'))
   }
 }
 
@@ -271,7 +271,7 @@ const archiveConfirmLabel = computed(() =>
         @editHistory="handleEditHistory"
         @deleteHistory="handleDeleteHistory"
         @updateNotes="handleUpdateNotes"
-        @updateDelivered="handleUpdateDelivered"
+        @delivery="handleDelivery"
       />
     </div>
 
