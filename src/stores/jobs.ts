@@ -397,11 +397,15 @@ export const useJobsStore = defineStore('jobs', () => {
       )
     } else {
       const recalculated = recalculateJobProduction(historyEntries, job)
+      const totalProduced =
+        recalculated.parts_produced + recalculated.parts_overproduced
+      const clampedDelivered = Math.min(job.delivered ?? 0, totalProduced)
       const { data: updatedJob, error: updateError } = await supabase
         .from('jobs')
         .update({
           parts_produced: recalculated.parts_produced,
           parts_overproduced: recalculated.parts_overproduced,
+          delivered: clampedDelivered,
           status: recalculated.status,
           updated_at: now,
         })
@@ -497,11 +501,15 @@ export const useJobsStore = defineStore('jobs', () => {
       )
     } else {
       const recalculated = recalculateJobProduction(historyEntries, job)
+      const totalProduced =
+        recalculated.parts_produced + recalculated.parts_overproduced
+      const clampedDelivered = Math.min(job.delivered ?? 0, totalProduced)
       const { data: updatedJob, error: jobUpdateError } = await supabase
         .from('jobs')
         .update({
           parts_produced: recalculated.parts_produced,
           parts_overproduced: recalculated.parts_overproduced,
+          delivered: clampedDelivered,
           status: recalculated.status,
           updated_at: now,
         })
@@ -552,6 +560,33 @@ export const useJobsStore = defineStore('jobs', () => {
     )
   }
 
+  function parseJobUpdateRecord(val: unknown): JobUpdateRecord {
+    if (!val || typeof val !== 'object') {
+      throw new Error('Invalid RPC response: expected object')
+    }
+    const o = val as Record<string, unknown>
+    if (
+      typeof o.id !== 'string' ||
+      typeof o.job_id !== 'string' ||
+      typeof o.delta !== 'number' ||
+      typeof o.created_at !== 'string'
+    ) {
+      throw new Error('Invalid RPC response: missing or invalid required fields')
+    }
+    return {
+      id: o.id,
+      job_id: o.job_id,
+      delta: o.delta,
+      update_type:
+        o.update_type === 'delivery' || o.update_type === 'production'
+          ? o.update_type
+          : undefined,
+      created_at: o.created_at,
+      updated_by: o.updated_by != null ? String(o.updated_by) : null,
+      note: o.note != null ? String(o.note) : null,
+    }
+  }
+
   async function addDelivery(id: string, delta: number, updatedBy?: string | null) {
     error.value = null
     const job = jobs.value.find((j) => j.id === id)
@@ -569,9 +604,8 @@ export const useJobsStore = defineStore('jobs', () => {
     }
     const now = formatISO(new Date())
 
-    const { data: historyInsert, error: rpcError } = await supabase.rpc('add_delivery', {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('add_delivery', {
       p_job_id: id,
-      p_new_delivered: newDelivered,
       p_delta: delta,
       p_updated_by: updatedBy ?? null,
       p_created_at: now,
@@ -582,7 +616,7 @@ export const useJobsStore = defineStore('jobs', () => {
       throw rpcError
     }
 
-    const newHistoryRecord = historyInsert as unknown as JobUpdateRecord
+    const newHistoryRecord = parseJobUpdateRecord(rpcData)
 
     jobs.value = jobs.value.map((item) => {
       if (item.id !== id) return item

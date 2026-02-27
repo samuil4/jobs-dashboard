@@ -106,7 +106,6 @@ COMMENT ON COLUMN public.job_updates.update_type IS 'production = parts produced
 ```sql
 CREATE OR REPLACE FUNCTION public.add_delivery(
   p_job_id uuid,
-  p_new_delivered integer,
   p_delta integer,
   p_updated_by uuid,
   p_created_at timestamptz
@@ -121,11 +120,12 @@ DECLARE
   inserted_row json;
 BEGIN
   UPDATE public.jobs
-  SET delivered = p_new_delivered, updated_at = p_created_at
-  WHERE id = p_job_id;
+  SET delivered = delivered + p_delta, updated_at = p_created_at
+  WHERE id = p_job_id
+    AND (delivered + p_delta) <= (parts_produced + parts_overproduced);
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Job not found: %', p_job_id;
+    RAISE EXCEPTION 'Job not found or delivered would exceed total parts produced: %', p_job_id;
   END IF;
 
   INSERT INTO public.job_updates (job_id, delta, update_type, updated_by, created_at)
@@ -137,8 +137,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, integer, uuid, timestamptz) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, integer, uuid, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, uuid, timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, uuid, timestamptz) TO service_role;
 ```
 
 Note: If you're creating a new database, the `parts_overproduced`, `notes`, `delivered`, and `update_type` columns are already included in the table creation SQL above.
