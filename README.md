@@ -30,6 +30,8 @@ create table public.jobs (
   parts_needed integer not null,
   parts_produced integer not null default 0,
   parts_overproduced integer not null default 0,
+  notes text default null,
+  delivered integer not null default 0,
   archived boolean not null default false,
   status text not null default 'active' check (status in ('active','completed','archived')),
   assignee text not null check (assignee in ('Samuil','Oleksii','Veselin')),
@@ -77,7 +79,18 @@ ADD COLUMN parts_overproduced INTEGER NOT NULL DEFAULT 0;
 COMMENT ON COLUMN public.jobs.parts_overproduced IS 'Number of parts produced beyond the requested amount (parts_needed)';
 ```
 
-Note: If you're creating a new database, the `parts_overproduced` column is already included in the table creation SQL above.
+2.2. If you have an existing database (created before notes and delivered support was added), run this migration:
+
+```sql
+ALTER TABLE public.jobs
+ADD COLUMN notes TEXT DEFAULT NULL,
+ADD COLUMN delivered INTEGER NOT NULL DEFAULT 0;
+
+COMMENT ON COLUMN public.jobs.notes IS 'Optional notes for the job';
+COMMENT ON COLUMN public.jobs.delivered IS 'Number of parts delivered';
+```
+
+Note: If you're creating a new database, the `parts_overproduced`, `notes`, and `delivered` columns are already included in the table creation SQL above.
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
 

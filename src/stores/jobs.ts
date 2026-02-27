@@ -39,7 +39,7 @@ export const useJobsStore = defineStore('jobs', () => {
     error.value = null
     const { data, error: fetchError } = await supabase
       .from('jobs')
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -67,13 +67,15 @@ export const useJobsStore = defineStore('jobs', () => {
         parts_needed: payload.partsNeeded,
         parts_produced: 0,
         parts_overproduced: 0,
+        notes: null,
+        delivered: 0,
         archived: false,
         status: 'active',
         assignee: payload.assignee,
         created_at: now,
         updated_at: now,
       })
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (insertError) {
@@ -124,7 +126,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: formatISO(new Date()),
       })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -155,7 +157,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: formatISO(new Date()),
       })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -362,7 +364,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: now,
       })
       .eq('id', jobId)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -430,7 +432,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: now,
       })
       .eq('id', jobId)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
       .single()
 
     if (jobUpdateError) {
@@ -442,6 +444,70 @@ export const useJobsStore = defineStore('jobs', () => {
     const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
     jobs.value = jobs.value.map((item) =>
       item.id === jobId ? withHistory(rest, job_updates) : item
+    )
+  }
+
+  const NOTES_MAX_LENGTH = 2000
+
+  async function updateJobNotes(id: string, notes: string | null) {
+    error.value = null
+    const job = jobs.value.find((j) => j.id === id)
+    if (!job) {
+      throw new Error('Job not found')
+    }
+    const trimmed = notes === null || notes === '' ? null : notes.trim()
+    if (trimmed !== null && trimmed.length > NOTES_MAX_LENGTH) {
+      throw new Error(`Notes must be at most ${NOTES_MAX_LENGTH} characters`)
+    }
+    const now = formatISO(new Date())
+    const { data, error: updateError } = await supabase
+      .from('jobs')
+      .update({ notes: trimmed, updated_at: now })
+      .eq('id', id)
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .single()
+
+    if (updateError) {
+      error.value = updateError.message
+      throw updateError
+    }
+
+    const { job_updates, ...rest } = data as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    jobs.value = jobs.value.map((item) =>
+      item.id === id ? withHistory(rest, job_updates) : item
+    )
+  }
+
+  async function updateJobDelivered(id: string, delivered: number) {
+    error.value = null
+    const job = jobs.value.find((j) => j.id === id)
+    if (!job) {
+      throw new Error('Job not found')
+    }
+    const value = Math.floor(delivered)
+    if (value < 0) {
+      throw new Error('Delivered must be a non-negative number')
+    }
+    const totalProduced = job.parts_produced + (job.parts_overproduced ?? 0)
+    if (value > totalProduced) {
+      throw new Error('Delivered cannot exceed total parts produced')
+    }
+    const now = formatISO(new Date())
+    const { data, error: updateError } = await supabase
+      .from('jobs')
+      .update({ delivered: value, updated_at: now })
+      .eq('id', id)
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .single()
+
+    if (updateError) {
+      error.value = updateError.message
+      throw updateError
+    }
+
+    const { job_updates, ...rest } = data as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    jobs.value = jobs.value.map((item) =>
+      item.id === id ? withHistory(rest, job_updates) : item
     )
   }
 
@@ -461,6 +527,8 @@ export const useJobsStore = defineStore('jobs', () => {
     addProduction,
     deleteHistoryItem,
     updateHistoryItem,
+    updateJobNotes,
+    updateJobDelivered,
     setSearch,
     setStatus,
     toggleArchivedVisibility,

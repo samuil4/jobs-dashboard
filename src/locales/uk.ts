@@ -32,6 +32,9 @@ export default {
     partsProduced: 'ГОТОВО',
     partsOverproduced: 'Над',
     partsRemaining: 'Залиш.',
+    delivered: 'Доставлено',
+    notes: 'Нотатки',
+    notesPlaceholder: 'Додати нотатки…',
     dateAdded: 'Дата створення',
     assignee: 'Відповідальний',
     assignees: {
@@ -102,6 +105,8 @@ export default {
     updateJob: 'Не вдалося оновити завдання. Спробуйте ще раз.',
     deleteJob: 'Не вдалося видалити завдання. Спробуйте ще раз.',
     updateProduction: 'Не вдалося оновити виробництво.',
+    invalidDelivered: 'Доставлено має бути невід\'ємним числом.',
+    deliveredExceedsProduced: 'Доставлено не може перевищувати загальну кількість вироблених.',
   },
 }
 
