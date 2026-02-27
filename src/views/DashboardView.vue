@@ -153,6 +153,24 @@ async function handleProduction(jobId: string, delta: number) {
   }
 }
 
+async function handleUpdateNotes(jobId: string, notes: string | null) {
+  try {
+    await jobsStore.updateJobNotes(jobId, notes)
+  } catch (err) {
+    console.error(err)
+    alert(t('errors.updateJob'))
+  }
+}
+
+async function handleUpdateDelivered(jobId: string, delivered: number) {
+  try {
+    await jobsStore.updateJobDelivered(jobId, delivered)
+  } catch (err) {
+    console.error(err)
+    alert(t('errors.updateJob'))
+  }
+}
+
 function handleEditHistory(jobId: string, historyId: string, currentDelta: number) {
   historyEditModal.jobId = jobId
   historyEditModal.historyId = historyId
@@ -252,6 +270,8 @@ const archiveConfirmLabel = computed(() =>
         @production="handleProduction"
         @editHistory="handleEditHistory"
         @deleteHistory="handleDeleteHistory"
+        @updateNotes="handleUpdateNotes"
+        @updateDelivered="handleUpdateDelivered"
       />
     </div>
 

@@ -67,6 +67,8 @@ async function seed() {
         name,
         parts_needed: partsNeeded,
         parts_produced: partsProduced,
+        notes: null,
+        delivered: 0,
         archived: false,
         status,
         assignee,

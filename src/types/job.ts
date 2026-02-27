@@ -8,6 +8,8 @@ export interface JobRecord {
   parts_needed: number
   parts_produced: number
   parts_overproduced: number
+  notes: string | null
+  delivered: number
   archived: boolean
   status: JobStatus
   assignee: Assignee

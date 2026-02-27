@@ -32,6 +32,9 @@ export default {
     partsProduced: 'DONE',
     partsOverproduced: 'Over',
     partsRemaining: 'Left',
+    delivered: 'Delivered',
+    notes: 'Notes',
+    notesPlaceholder: 'Add notes…',
     dateAdded: 'Date added',
     assignee: 'Assignee',
     assignees: {
@@ -101,6 +104,8 @@ export default {
     updateJob: 'Could not update job. Try again.',
     deleteJob: 'Could not delete job. Try again.',
     updateProduction: 'Failed to update production.',
+    invalidDelivered: 'Delivered must be a non-negative number.',
+    deliveredExceedsProduced: 'Delivered cannot exceed total parts produced.',
   },
 }
 

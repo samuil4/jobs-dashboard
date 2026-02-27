@@ -32,6 +32,9 @@ export default {
     partsProduced: 'ГОТОВО',
     partsOverproduced: 'Над',
     partsRemaining: 'Ост.',
+    delivered: 'Доставени',
+    notes: 'Бележки',
+    notesPlaceholder: 'Добавете бележки…',
     dateAdded: 'Дата на създаване',
     assignee: 'Отговорник',
     assignees: {
@@ -102,6 +105,8 @@ export default {
     updateJob: 'Редакцията беше неуспешна. Опитайте пак.',
     deleteJob: 'Изтриването беше неуспешно. Опитайте пак.',
     updateProduction: 'Промяната на произведените бройки беше неуспешна.',
+    invalidDelivered: 'Доставените трябва да са неотрицателно число.',
+    deliveredExceedsProduced: 'Доставените не могат да надвишават общо произведените.',
   },
 }
 

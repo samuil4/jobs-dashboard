@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 
@@ -16,11 +16,30 @@ const emit = defineEmits<{
   (e: 'production', jobId: string, delta: number): void
   (e: 'editHistory', jobId: string, historyId: string, currentDelta: number): void
   (e: 'deleteHistory', jobId: string, historyId: string): void
+  (e: 'updateNotes', jobId: string, notes: string | null): void
+  (e: 'updateDelivered', jobId: string, delivered: number): void
 }>()
 
 const { t } = useI18n()
 const productionInput = ref<number | null>(null)
+const deliveredInput = ref<number>(0)
+const notesInput = ref<string>('')
 const localError = ref<string | null>(null)
+
+watch(
+  () => props.job.notes,
+  (val) => { notesInput.value = val ?? '' },
+  { immediate: true }
+)
+watch(
+  () => props.job.delivered,
+  (val) => { deliveredInput.value = val ?? 0 },
+  { immediate: true }
+)
+
+const totalProduced = computed(
+  () => (props.job.parts_produced ?? 0) + (props.job.parts_overproduced ?? 0)
+)
 
 const partsRemaining = computed(() =>
   Math.max(props.job.parts_needed - props.job.parts_produced, 0)
@@ -61,6 +80,28 @@ function formatHistoryEntry(delta: number, createdAt: string) {
     date: format(new Date(createdAt), 'dd MMM yyyy HH:mm'),
   })
 }
+
+function handleNotesBlur() {
+  const value = notesInput.value.trim()
+  const normalized = value === '' ? null : value
+  emit('updateNotes', props.job.id, normalized)
+}
+
+function handleDeliveredBlur() {
+  localError.value = null
+  const num = Math.floor(Number(deliveredInput.value))
+  if (Number.isNaN(num) || num < 0) {
+    localError.value = t('errors.invalidDelivered')
+    return
+  }
+  if (num > totalProduced.value) {
+    localError.value = t('errors.deliveredExceedsProduced')
+    return
+  }
+  if (num !== (props.job.delivered ?? 0)) {
+    emit('updateDelivered', props.job.id, num)
+  }
+}
 </script>
 
 <template>
@@ -98,6 +139,33 @@ function formatHistoryEntry(delta: number, createdAt: string) {
           <span class="label">{{ t('jobs.partsOverproduced') }}:</span>
           <strong>{{ partsOverproduced }}</strong>
         </div>
+        <div class="stat-item delivered-row">
+          <span class="label">{{ t('jobs.delivered') }}:</span>
+          <input
+            :id="`delivered-${job.id}`"
+            v-model.number="deliveredInput"
+            type="number"
+            min="0"
+            :max="totalProduced"
+            :aria-label="t('jobs.delivered')"
+            class="delivered-input"
+            @blur="handleDeliveredBlur"
+          />
+        </div>
+      </div>
+
+      <div class="notes-section">
+        <label :for="`notes-${job.id}`" class="notes-label">{{ t('jobs.notes') }}</label>
+        <textarea
+          :id="`notes-${job.id}`"
+          v-model="notesInput"
+          :placeholder="t('jobs.notesPlaceholder')"
+          :aria-label="t('jobs.notes')"
+          class="notes-input"
+          rows="2"
+          maxlength="2000"
+          @blur="handleNotesBlur"
+        />
       </div>
 
       <form class="production-form" @submit.prevent="handleProductionSubmit">
@@ -256,6 +324,57 @@ function formatHistoryEntry(delta: number, createdAt: string) {
 
 .stat-item.overproduced strong {
   color: #2563eb;
+}
+
+.delivered-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.delivered-input {
+  width: 72px;
+  height: 28px;
+  padding: 4px 8px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.delivered-input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.notes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notes-label {
+  font-size: 13px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.notes-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  resize: vertical;
+  min-height: 56px;
+}
+
+.notes-input:focus {
+  outline: none;
+  border-color: #2563eb;
 }
 
 .production-form {
