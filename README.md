@@ -101,6 +101,46 @@ ADD COLUMN update_type TEXT NOT NULL DEFAULT 'production'
 COMMENT ON COLUMN public.job_updates.update_type IS 'production = parts produced, delivery = parts delivered';
 ```
 
+2.4. Add the atomic `add_delivery` function (runs UPDATE jobs + INSERT job_updates in a single transaction):
+
+```sql
+CREATE OR REPLACE FUNCTION public.add_delivery(
+  p_job_id uuid,
+  p_new_delivered integer,
+  p_delta integer,
+  p_updated_by uuid,
+  p_created_at timestamptz
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec record;
+  inserted_row json;
+BEGIN
+  UPDATE public.jobs
+  SET delivered = p_new_delivered, updated_at = p_created_at
+  WHERE id = p_job_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Job not found: %', p_job_id;
+  END IF;
+
+  INSERT INTO public.job_updates (job_id, delta, update_type, updated_by, created_at)
+  VALUES (p_job_id, p_delta, 'delivery', p_updated_by, p_created_at)
+  RETURNING * INTO rec;
+
+  inserted_row := row_to_json(rec);
+  RETURN inserted_row;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, integer, uuid, timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, integer, uuid, timestamptz) TO service_role;
+```
+
 Note: If you're creating a new database, the `parts_overproduced`, `notes`, `delivered`, and `update_type` columns are already included in the table creation SQL above.
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.

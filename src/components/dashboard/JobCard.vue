@@ -24,7 +24,8 @@ const { t } = useI18n()
 const productionInput = ref<number | null>(null)
 const deliveryInput = ref<number | null>(null)
 const notesInput = ref<string>('')
-const localError = ref<string | null>(null)
+const productionError = ref<string | null>(null)
+const deliveryError = ref<string | null>(null)
 
 watch(
   () => props.job.notes,
@@ -54,9 +55,9 @@ const statusBadgeClass = computed(() => {
 })
 
 async function handleProductionSubmit() {
-  localError.value = null
+  productionError.value = null
   if (!productionInput.value || productionInput.value <= 0) {
-    localError.value = t('common.invalidNumber')
+    productionError.value = t('common.invalidNumber')
     return
   }
 
@@ -65,7 +66,7 @@ async function handleProductionSubmit() {
     productionInput.value = null
   } catch (error) {
     console.error(error)
-    localError.value = t('errors.updateProduction')
+    productionError.value = t('errors.updateProduction')
   }
 }
 
@@ -84,14 +85,14 @@ function handleNotesBlur() {
 }
 
 async function handleDeliverySubmit() {
-  localError.value = null
+  deliveryError.value = null
   if (!deliveryInput.value || deliveryInput.value <= 0) {
-    localError.value = t('common.invalidNumber')
+    deliveryError.value = t('common.invalidNumber')
     return
   }
   const delivered = props.job.delivered ?? 0
   if (deliveryInput.value + delivered > totalProduced.value) {
-    localError.value = t('errors.deliveredExceedsProduced')
+    deliveryError.value = t('errors.deliveredExceedsProduced')
     return
   }
   try {
@@ -99,7 +100,7 @@ async function handleDeliverySubmit() {
     deliveryInput.value = null
   } catch (error) {
     console.error(error)
-    localError.value = t('errors.updateProduction')
+    deliveryError.value = t('errors.updateProduction')
   }
 }
 </script>
@@ -174,7 +175,7 @@ async function handleDeliverySubmit() {
             {{ t('jobs.updateProduction') }}
           </button>
         </div>
-        <p v-if="localError" class="error">{{ localError }}</p>
+        <p v-if="productionError" class="error">{{ productionError }}</p>
       </form>
 
       <form class="delivery-form" @submit.prevent="handleDeliverySubmit">
@@ -192,7 +193,7 @@ async function handleDeliverySubmit() {
             {{ t('jobs.addDelivery') }}
           </button>
         </div>
-        <p v-if="localError" class="error">{{ localError }}</p>
+        <p v-if="deliveryError" class="error">{{ deliveryError }}</p>
       </form>
     </section>
 
@@ -395,7 +396,8 @@ async function handleDeliverySubmit() {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.production-form .error {
+.production-form .error,
+.delivery-form .error {
   color: #dc2626;
   font-size: 12px;
   margin: 8px 0 0;

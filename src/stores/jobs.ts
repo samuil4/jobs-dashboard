@@ -336,8 +336,23 @@ export const useJobsStore = defineStore('jobs', () => {
       throw new Error('Job not found')
     }
 
-    const deletedEntry = job.job_updates.find((e) => e.id === historyId)
-    const isDelivery = deletedEntry?.update_type === 'delivery'
+    const { data: persistedEntry, error: fetchEntryError } = await supabase
+      .from('job_updates')
+      .select('update_type, job_id')
+      .eq('id', historyId)
+      .single()
+
+    if (fetchEntryError || !persistedEntry) {
+      error.value = fetchEntryError?.message ?? 'History entry not found'
+      throw fetchEntryError ?? new Error('History entry not found')
+    }
+
+    if (persistedEntry.job_id !== jobId) {
+      error.value = 'History entry does not belong to this job'
+      throw new Error('History entry does not belong to this job')
+    }
+
+    const isDelivery = persistedEntry.update_type === 'delivery'
 
     // Delete the history entry from database
     const { error: deleteError } = await supabase.from('job_updates').delete().eq('id', historyId)
@@ -418,8 +433,23 @@ export const useJobsStore = defineStore('jobs', () => {
       throw new Error('Job not found')
     }
 
-    const editedEntry = job.job_updates.find((e) => e.id === historyId)
-    const isDelivery = editedEntry?.update_type === 'delivery'
+    const { data: persistedEntry, error: fetchEntryError } = await supabase
+      .from('job_updates')
+      .select('update_type, job_id')
+      .eq('id', historyId)
+      .single()
+
+    if (fetchEntryError || !persistedEntry) {
+      error.value = fetchEntryError?.message ?? 'History entry not found'
+      throw fetchEntryError ?? new Error('History entry not found')
+    }
+
+    if (persistedEntry.job_id !== jobId) {
+      error.value = 'History entry does not belong to this job'
+      throw new Error('History entry does not belong to this job')
+    }
+
+    const isDelivery = persistedEntry.update_type === 'delivery'
 
     // Update the history entry in database
     const { error: updateError } = await supabase
@@ -539,34 +569,20 @@ export const useJobsStore = defineStore('jobs', () => {
     }
     const now = formatISO(new Date())
 
-    const { error: jobUpdateError } = await supabase
-      .from('jobs')
-      .update({ delivered: newDelivered, updated_at: now })
-      .eq('id', id)
+    const { data: historyInsert, error: rpcError } = await supabase.rpc('add_delivery', {
+      p_job_id: id,
+      p_new_delivered: newDelivered,
+      p_delta: delta,
+      p_updated_by: updatedBy ?? null,
+      p_created_at: now,
+    })
 
-    if (jobUpdateError) {
-      error.value = jobUpdateError.message
-      throw jobUpdateError
+    if (rpcError) {
+      error.value = rpcError.message
+      throw rpcError
     }
 
-    const { data: historyInsert, error: historyError } = await supabase
-      .from('job_updates')
-      .insert({
-        job_id: id,
-        delta,
-        update_type: 'delivery',
-        updated_by: updatedBy ?? null,
-        created_at: now,
-      })
-      .select()
-      .single()
-
-    if (historyError) {
-      error.value = historyError.message
-      throw historyError
-    }
-
-    const newHistoryRecord = historyInsert as JobUpdateRecord
+    const newHistoryRecord = historyInsert as unknown as JobUpdateRecord
 
     jobs.value = jobs.value.map((item) => {
       if (item.id !== id) return item
