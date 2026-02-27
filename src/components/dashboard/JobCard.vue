@@ -17,23 +17,19 @@ const emit = defineEmits<{
   (e: 'editHistory', jobId: string, historyId: string, currentDelta: number): void
   (e: 'deleteHistory', jobId: string, historyId: string): void
   (e: 'updateNotes', jobId: string, notes: string | null): void
-  (e: 'updateDelivered', jobId: string, delivered: number): void
+  (e: 'delivery', jobId: string, delta: number): void
 }>()
 
 const { t } = useI18n()
 const productionInput = ref<number | null>(null)
-const deliveredInput = ref<number>(0)
+const deliveryInput = ref<number | null>(null)
 const notesInput = ref<string>('')
-const localError = ref<string | null>(null)
+const productionError = ref<string | null>(null)
+const deliveryError = ref<string | null>(null)
 
 watch(
   () => props.job.notes,
   (val) => { notesInput.value = val ?? '' },
-  { immediate: true }
-)
-watch(
-  () => props.job.delivered,
-  (val) => { deliveredInput.value = val ?? 0 },
   { immediate: true }
 )
 
@@ -59,9 +55,9 @@ const statusBadgeClass = computed(() => {
 })
 
 async function handleProductionSubmit() {
-  localError.value = null
+  productionError.value = null
   if (!productionInput.value || productionInput.value <= 0) {
-    localError.value = t('common.invalidNumber')
+    productionError.value = t('common.invalidNumber')
     return
   }
 
@@ -70,15 +66,16 @@ async function handleProductionSubmit() {
     productionInput.value = null
   } catch (error) {
     console.error(error)
-    localError.value = t('errors.updateProduction')
+    productionError.value = t('errors.updateProduction')
   }
 }
 
-function formatHistoryEntry(delta: number, createdAt: string) {
-  return t('jobs.history.entry', {
-    quantity: delta,
-    date: format(new Date(createdAt), 'dd MMM yyyy HH:mm'),
-  })
+function formatHistoryEntry(delta: number, createdAt: string, updateType?: string) {
+  const date = format(new Date(createdAt), 'dd MMM yyyy HH:mm')
+  if (updateType === 'delivery') {
+    return t('jobs.history.entryDelivered', { quantity: delta, date })
+  }
+  return t('jobs.history.entry', { quantity: delta, date })
 }
 
 function handleNotesBlur() {
@@ -87,19 +84,23 @@ function handleNotesBlur() {
   emit('updateNotes', props.job.id, normalized)
 }
 
-function handleDeliveredBlur() {
-  localError.value = null
-  const num = Math.floor(Number(deliveredInput.value))
-  if (Number.isNaN(num) || num < 0) {
-    localError.value = t('errors.invalidDelivered')
+async function handleDeliverySubmit() {
+  deliveryError.value = null
+  if (!deliveryInput.value || deliveryInput.value <= 0) {
+    deliveryError.value = t('common.invalidNumber')
     return
   }
-  if (num > totalProduced.value) {
-    localError.value = t('errors.deliveredExceedsProduced')
+  const delivered = props.job.delivered ?? 0
+  if (deliveryInput.value + delivered > totalProduced.value) {
+    deliveryError.value = t('errors.deliveredExceedsProduced')
     return
   }
-  if (num !== (props.job.delivered ?? 0)) {
-    emit('updateDelivered', props.job.id, num)
+  try {
+    emit('delivery', props.job.id, deliveryInput.value)
+    deliveryInput.value = null
+  } catch (error) {
+    console.error(error)
+    deliveryError.value = t('errors.updateProduction')
   }
 }
 </script>
@@ -139,18 +140,9 @@ function handleDeliveredBlur() {
           <span class="label">{{ t('jobs.partsOverproduced') }}:</span>
           <strong>{{ partsOverproduced }}</strong>
         </div>
-        <div class="stat-item delivered-row">
+        <div class="stat-item">
           <span class="label">{{ t('jobs.delivered') }}:</span>
-          <input
-            :id="`delivered-${job.id}`"
-            v-model.number="deliveredInput"
-            type="number"
-            min="0"
-            :max="totalProduced"
-            :aria-label="t('jobs.delivered')"
-            class="delivered-input"
-            @blur="handleDeliveredBlur"
-          />
+          <strong>{{ job.delivered ?? 0 }}</strong>
         </div>
       </div>
 
@@ -183,7 +175,25 @@ function handleDeliveredBlur() {
             {{ t('jobs.updateProduction') }}
           </button>
         </div>
-        <p v-if="localError" class="error">{{ localError }}</p>
+        <p v-if="productionError" class="error">{{ productionError }}</p>
+      </form>
+
+      <form class="delivery-form" @submit.prevent="handleDeliverySubmit">
+        <div class="production-form-row">
+          <input
+            :id="`delivery-${job.id}`"
+            v-model.number="deliveryInput"
+            type="number"
+            min="1"
+            :placeholder="t('jobs.addDelivery')"
+            :aria-label="t('jobs.addDelivery')"
+            class="production-input"
+          />
+          <button class="btn btn-primary" type="submit">
+            {{ t('jobs.addDelivery') }}
+          </button>
+        </div>
+        <p v-if="deliveryError" class="error">{{ deliveryError }}</p>
       </form>
     </section>
 
@@ -195,7 +205,7 @@ function handleDeliveredBlur() {
         </div>
         <ul v-else>
           <li v-for="update in job.job_updates" :key="update.id" class="history-item">
-            <span class="history-entry">{{ formatHistoryEntry(update.delta, update.created_at) }}</span>
+            <span class="history-entry">{{ formatHistoryEntry(update.delta, update.created_at, update.update_type) }}</span>
             <div class="history-actions">
               <button
                 class="btn-icon"
@@ -326,27 +336,6 @@ function handleDeliveredBlur() {
   color: #2563eb;
 }
 
-.delivered-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.delivered-input {
-  width: 72px;
-  height: 28px;
-  padding: 4px 8px;
-  font-size: 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-}
-
-.delivered-input:focus {
-  outline: none;
-  border-color: #2563eb;
-}
-
 .notes-section {
   display: flex;
   flex-direction: column;
@@ -377,7 +366,8 @@ function handleDeliveredBlur() {
   border-color: #2563eb;
 }
 
-.production-form {
+.production-form,
+.delivery-form {
   margin-top: 12px;
 }
 
@@ -406,7 +396,8 @@ function handleDeliveredBlur() {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.production-form .error {
+.production-form .error,
+.delivery-form .error {
   color: #dc2626;
   font-size: 12px;
   margin: 8px 0 0;

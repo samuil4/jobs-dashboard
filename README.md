@@ -44,6 +44,7 @@ create table public.job_updates (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references public.jobs(id) on delete cascade,
   delta integer not null,
+  update_type text not null default 'production' check (update_type in ('production','delivery')),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
@@ -90,7 +91,57 @@ COMMENT ON COLUMN public.jobs.notes IS 'Optional notes for the job';
 COMMENT ON COLUMN public.jobs.delivered IS 'Number of parts delivered';
 ```
 
-Note: If you're creating a new database, the `parts_overproduced`, `notes`, and `delivered` columns are already included in the table creation SQL above.
+2.3. If you have an existing database (created before delivery history support was added), run this migration:
+
+```sql
+ALTER TABLE public.job_updates
+ADD COLUMN update_type TEXT NOT NULL DEFAULT 'production'
+  CHECK (update_type IN ('production','delivery'));
+
+COMMENT ON COLUMN public.job_updates.update_type IS 'production = parts produced, delivery = parts delivered';
+```
+
+2.4. Add the atomic `add_delivery` function (runs UPDATE jobs + INSERT job_updates in a single transaction):
+
+```sql
+CREATE OR REPLACE FUNCTION public.add_delivery(
+  p_job_id uuid,
+  p_delta integer,
+  p_updated_by uuid,
+  p_created_at timestamptz
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec record;
+  inserted_row json;
+BEGIN
+  UPDATE public.jobs
+  SET delivered = delivered + p_delta, updated_at = p_created_at
+  WHERE id = p_job_id
+    AND (delivered + p_delta) <= (parts_produced + parts_overproduced);
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Job not found or delivered would exceed total parts produced: %', p_job_id;
+  END IF;
+
+  INSERT INTO public.job_updates (job_id, delta, update_type, updated_by, created_at)
+  VALUES (p_job_id, p_delta, 'delivery', p_updated_by, p_created_at)
+  RETURNING * INTO rec;
+
+  inserted_row := row_to_json(rec);
+  RETURN inserted_row;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, uuid, timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, uuid, timestamptz) TO service_role;
+```
+
+Note: If you're creating a new database, the `parts_overproduced`, `notes`, `delivered`, and `update_type` columns are already included in the table creation SQL above.
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
 

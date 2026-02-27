@@ -52,6 +52,7 @@ export default {
     unarchive: 'Възстанови',
     delete: 'Изтрий',
     updateProduction: 'Добави производство',
+    addDelivery: 'Добави доставка',
     productionDelta: 'Произведено количество',
     deltaHelp:
       'Въведете броя допълнително произведени детайли. Надпроизводството над необходимото количество ще се проследява отделно и ще се добави в историята.',
@@ -69,6 +70,7 @@ export default {
       title: 'История',
       empty: 'Няма записани промени',
       entry: 'Добавени {quantity} на {date}',
+      entryDelivered: '{quantity} доставени на {date}',
       edit: 'Редактирай',
       delete: 'Изтрий',
       editTitle: 'Редакция на запис',

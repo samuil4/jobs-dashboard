@@ -89,6 +89,7 @@ async function seed() {
     const historyPayload = historyItems.map((item) => ({
       job_id: jobData.id,
       delta: item.delta,
+      update_type: 'production',
       created_at: item.created_at,
     }))
 

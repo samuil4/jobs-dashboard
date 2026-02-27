@@ -52,6 +52,7 @@ export default {
     unarchive: 'Повернути',
     delete: 'Видалити',
     updateProduction: 'Додати виробництво',
+    addDelivery: 'Додати доставку',
     productionDelta: 'Скільки додано',
     deltaHelp:
       'Вкажіть, скільки додаткових деталей виготовлено. Перевиробництво понад необхідну кількість відстежуватиметься окремо та потрапить в історію.',
@@ -69,6 +70,7 @@ export default {
       title: 'Історія виробництва',
       empty: 'Немає записів',
       entry: 'Додано {quantity} {date}',
+      entryDelivered: '{quantity} доставлено {date}',
       edit: 'Редагувати',
       delete: 'Видалити',
       editTitle: 'Редагувати запис',
