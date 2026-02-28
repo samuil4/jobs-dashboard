@@ -9,6 +9,7 @@ Manufacturing jobs dashboard built with Vue 3 + Vite. Tracks production targets,
 - Automatic completion state when produced equals required.
 - History timeline for every job update.
 - Filter/search by status, archived state or keyword.
+- Client share links: password-protected read-only job view at `/share/:jobId` for non-registered users (parts needed, parts produced, parts ready for delivery). Access TTL 72 hours.
 - Simple username/password login (Supabase auth), plus logout.
 - CSV seeding script to bootstrap data from `reference/uchet_izdeliy.csv`.
 - i18n-ready UI with runtime language switcher (English default).
@@ -141,7 +142,58 @@ GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, uuid, timestamptz) 
 GRANT EXECUTE ON FUNCTION public.add_delivery(uuid, integer, uuid, timestamptz) TO service_role;
 ```
 
-Note: If you're creating a new database, the `parts_overproduced`, `notes`, `delivered`, and `update_type` columns are already included in the table creation SQL above.
+2.5. Add client share functionality (password-protected share links). Share passwords are hashed with bcrypt $2b$ (frontend uses bcryptjs); the backend verifies via pgcrypto `extensions.crypt`:
+
+```sql
+-- Add share_password_hash column to jobs table
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS share_password_hash text;
+
+-- Enable pgcrypto extension for bcrypt (if not already enabled)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- RPC: Verify job share password and return job data if valid
+-- Stored hashes are bcrypt $2b$; uses schema-qualified extensions.crypt for verification
+CREATE OR REPLACE FUNCTION public.verify_job_share_password(p_job_id uuid, p_password text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_hash text;
+  v_result jsonb;
+BEGIN
+  SELECT share_password_hash INTO v_hash FROM jobs WHERE id = p_job_id;
+  IF v_hash IS NULL THEN
+    RETURN jsonb_build_object('valid', false, 'error', 'no_share_password');
+  END IF;
+  IF extensions.crypt(p_password, v_hash) != v_hash THEN
+    RETURN jsonb_build_object('valid', false);
+  END IF;
+  SELECT jsonb_build_object(
+    'valid', true,
+    'job', jsonb_build_object(
+      'id', id, 'name', name, 'parts_needed', parts_needed,
+      'parts_produced', parts_produced, 'parts_overproduced', COALESCE(parts_overproduced, 0),
+      'delivered', COALESCE(delivered, 0)
+    )
+  ) INTO v_result
+  FROM jobs WHERE id = p_job_id;
+  RETURN v_result;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.verify_job_share_password(uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.verify_job_share_password(uuid, text) TO authenticated;
+```
+
+**Note:** Share password verification uses an Edge Function (`verify-job-share-password`) instead of the RPC above, because the frontend hashes passwords with bcryptjs ($2b$) and pgcrypto's `crypt()` does not reliably verify those hashes in Supabase. Deploy the Edge Function:
+
+```bash
+supabase functions deploy verify-job-share-password --no-verify-jwt
+```
+
+The function requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (set as secrets or provided by Supabase). It is invoked with `--no-verify-jwt` so anonymous users can call it from the share view.
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
 

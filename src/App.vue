@@ -16,8 +16,18 @@ const { t } = useI18n()
 
 const { searchTerm, statusFilter, showArchived } = storeToRefs(jobsStore)
 
-const showHeader = computed(() => authStore.isAuthenticated && route.name !== 'login')
-const showFooter = computed(() => authStore.isAuthenticated && route.name !== 'login')
+const showHeader = computed(
+  () =>
+    authStore.isAuthenticated &&
+    route.name !== 'login' &&
+    route.name !== 'jobShare'
+)
+const showFooter = computed(
+  () =>
+    authStore.isAuthenticated &&
+    route.name !== 'login' &&
+    route.name !== 'jobShare'
+)
 const isDashboard = computed(() => route.name === 'dashboard')
 
 const archivedToggleLabel = computed(() =>

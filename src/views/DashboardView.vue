@@ -53,6 +53,7 @@ const modalInitialValues = computed(() => {
     name: job.name,
     partsNeeded: job.parts_needed,
     assignee: job.assignee as Assignee,
+    hasSharePassword: Boolean(job.has_share_password),
   }
 })
 
@@ -78,12 +79,30 @@ function openEditModal(jobId: string) {
   showModal.value = true
 }
 
-async function handleModalSubmit(payload: { name: string; partsNeeded: number; assignee: Assignee }) {
+async function handleModalSubmit(payload: {
+  name: string
+  partsNeeded: number
+  assignee: Assignee
+  sharePassword?: string | null
+}) {
   try {
     if (modalMode.value === 'create') {
       await jobsStore.createJob(payload)
     } else if (editingJobId.value) {
-      await jobsStore.updateJob(editingJobId.value, payload)
+      const updatePayload: {
+        name: string
+        partsNeeded: number
+        assignee: Assignee
+        sharePassword?: string | null
+      } = {
+        name: payload.name,
+        partsNeeded: payload.partsNeeded,
+        assignee: payload.assignee,
+      }
+      if (payload.sharePassword != null && payload.sharePassword.trim() !== '') {
+        updatePayload.sharePassword = payload.sharePassword
+      }
+      await jobsStore.updateJob(editingJobId.value, updatePayload)
     }
     showModal.value = false
   } catch (err) {
