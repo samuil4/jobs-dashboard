@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -66,16 +66,6 @@ watch(jobId, (id) => {
     job.value = stored.job
   }
 }, { immediate: true })
-
-onMounted(() => {
-  if (jobId.value) {
-    const stored = getStoredAccess(jobId.value)
-    if (stored.valid && stored.job) {
-      unlocked.value = true
-      job.value = stored.job
-    }
-  }
-})
 
 async function handlePasswordSubmit() {
   if (!jobId.value || !password.value.trim()) {

@@ -15,7 +15,7 @@ export interface JobRecord {
   assignee: Assignee
   created_at: string
   updated_at: string
-  share_password_hash?: string | null
+  has_share_password?: boolean
 }
 
 export interface JobWithHistory extends JobRecord {

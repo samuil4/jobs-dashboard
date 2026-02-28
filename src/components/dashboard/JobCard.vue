@@ -107,7 +107,7 @@ async function handleDeliverySubmit() {
   }
 }
 
-const canShare = computed(() => Boolean(props.job.share_password_hash))
+const canShare = computed(() => Boolean(props.job.has_share_password))
 const shareLinkCopied = ref(false)
 
 function copyShareLink() {

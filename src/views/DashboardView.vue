@@ -53,7 +53,7 @@ const modalInitialValues = computed(() => {
     name: job.name,
     partsNeeded: job.parts_needed,
     assignee: job.assignee as Assignee,
-    hasSharePassword: Boolean(job.share_password_hash),
+    hasSharePassword: Boolean(job.has_share_password),
   }
 })
 
