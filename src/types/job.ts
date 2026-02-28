@@ -15,6 +15,7 @@ export interface JobRecord {
   assignee: Assignee
   created_at: string
   updated_at: string
+  share_password_hash?: string | null
 }
 
 export interface JobWithHistory extends JobRecord {
@@ -37,11 +38,22 @@ export interface NewJobPayload {
   name: string
   partsNeeded: number
   assignee: Assignee
+  sharePassword?: string | null
 }
 
 export interface UpdateJobPayload {
   name: string
   partsNeeded: number
   assignee: Assignee
+  sharePassword?: string | null
+}
+
+export interface JobShareData {
+  id: string
+  name: string
+  parts_needed: number
+  parts_produced: number
+  parts_overproduced: number
+  delivered: number
 }
 

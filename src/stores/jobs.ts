@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import bcrypt from 'bcryptjs'
 import { formatISO } from 'date-fns'
 
 import { supabase } from '../lib/supabase'
@@ -39,7 +40,7 @@ export const useJobsStore = defineStore('jobs', () => {
     error.value = null
     const { data, error: fetchError } = await supabase
       .from('jobs')
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -60,22 +61,31 @@ export const useJobsStore = defineStore('jobs', () => {
   async function createJob(payload: NewJobPayload) {
     error.value = null
     const now = formatISO(new Date())
+    // Share passwords are hashed with bcrypt ($2b$) via bcryptjs; backend verifies via extensions.crypt
+    const sharePasswordHash =
+      payload.sharePassword != null && payload.sharePassword.trim() !== ''
+        ? await bcrypt.hash(payload.sharePassword.trim(), 10)
+        : null
+    const insertPayload: Record<string, unknown> = {
+      name: payload.name,
+      parts_needed: payload.partsNeeded,
+      parts_produced: 0,
+      parts_overproduced: 0,
+      notes: null,
+      delivered: 0,
+      archived: false,
+      status: 'active',
+      assignee: payload.assignee,
+      created_at: now,
+      updated_at: now,
+    }
+    if (sharePasswordHash !== null) {
+      insertPayload.share_password_hash = sharePasswordHash
+    }
     const { data, error: insertError } = await supabase
       .from('jobs')
-      .insert({
-        name: payload.name,
-        parts_needed: payload.partsNeeded,
-        parts_produced: 0,
-        parts_overproduced: 0,
-        notes: null,
-        delivered: 0,
-        archived: false,
-        status: 'active',
-        assignee: payload.assignee,
-        created_at: now,
-        updated_at: now,
-      })
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .insert(insertPayload)
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
       .single()
 
     if (insertError) {
@@ -113,20 +123,30 @@ export const useJobsStore = defineStore('jobs', () => {
 
     const newStatus =
       newPartsProduced >= payload.partsNeeded ? ('completed' as const) : ('active' as const)
-
+    // Share passwords are hashed with bcrypt ($2b$) via bcryptjs; backend verifies via extensions.crypt
+    const sharePasswordHash =
+      payload.sharePassword !== undefined
+        ? payload.sharePassword != null && payload.sharePassword.trim() !== ''
+          ? await bcrypt.hash(payload.sharePassword.trim(), 10)
+          : null
+        : undefined
+    const updatePayload: Record<string, unknown> = {
+      name: payload.name,
+      parts_needed: payload.partsNeeded,
+      parts_produced: newPartsProduced,
+      parts_overproduced: newPartsOverproduced,
+      assignee: payload.assignee,
+      status: job.archived ? 'archived' : newStatus,
+      updated_at: formatISO(new Date()),
+    }
+    if (sharePasswordHash !== undefined) {
+      updatePayload.share_password_hash = sharePasswordHash
+    }
     const { data, error: updateError } = await supabase
       .from('jobs')
-      .update({
-        name: payload.name,
-        parts_needed: payload.partsNeeded,
-        parts_produced: newPartsProduced,
-        parts_overproduced: newPartsOverproduced,
-        assignee: payload.assignee,
-        status: job.archived ? 'archived' : newStatus,
-        updated_at: formatISO(new Date()),
-      })
+      .update(updatePayload)
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -157,7 +177,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: formatISO(new Date()),
       })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -383,7 +403,7 @@ export const useJobsStore = defineStore('jobs', () => {
         .from('jobs')
         .update({ delivered: newDelivered, updated_at: now })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
         .single()
 
       if (updateError) {
@@ -410,7 +430,7 @@ export const useJobsStore = defineStore('jobs', () => {
           updated_at: now,
         })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
         .single()
 
       if (updateError) {
@@ -487,7 +507,7 @@ export const useJobsStore = defineStore('jobs', () => {
         .from('jobs')
         .update({ delivered: newDelivered, updated_at: now })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
         .single()
 
       if (jobUpdateError) {
@@ -514,7 +534,7 @@ export const useJobsStore = defineStore('jobs', () => {
           updated_at: now,
         })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
         .single()
 
       if (jobUpdateError) {
@@ -546,7 +566,7 @@ export const useJobsStore = defineStore('jobs', () => {
       .from('jobs')
       .update({ notes: trimmed, updated_at: now })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, share_password_hash, job_updates (*)')
       .single()
 
     if (updateError) {

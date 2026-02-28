@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 
 import type { JobWithHistory } from '../../types/job'
+
+const router = useRouter()
 
 const props = defineProps<{
   job: JobWithHistory
@@ -103,6 +106,21 @@ async function handleDeliverySubmit() {
     deliveryError.value = t('errors.updateProduction')
   }
 }
+
+const canShare = computed(() => Boolean(props.job.share_password_hash))
+const shareLinkCopied = ref(false)
+
+function copyShareLink() {
+  if (!canShare.value) return
+  const url = `${window.location.origin}${router.resolve({ name: 'jobShare', params: { jobId: props.job.id } }).href}`
+  navigator.clipboard
+    .writeText(url)
+    .then(() => {
+      shareLinkCopied.value = true
+      setTimeout(() => { shareLinkCopied.value = false }, 2000)
+    })
+    .catch(() => {})
+}
 </script>
 
 <template>
@@ -115,6 +133,23 @@ async function handleDeliverySubmit() {
         </p>
       </div>
       <div class="status">
+        <button
+          v-if="canShare"
+          type="button"
+          class="btn-share-link"
+          :title="shareLinkCopied ? t('jobs.shareLinkCopied') : t('jobs.copyShareLink')"
+          :aria-label="shareLinkCopied ? t('jobs.shareLinkCopied') : t('jobs.copyShareLink')"
+          @click="copyShareLink"
+        >
+          <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+          <span v-if="shareLinkCopied" class="share-feedback">{{ t('jobs.shareLinkCopied') }}</span>
+        </button>
         <span :class="statusBadgeClass">
           {{ t(`jobs.status.${job.status}`) }}
         </span>
@@ -283,9 +318,42 @@ async function handleDeliverySubmit() {
 .status {
   text-align: right;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-share-link {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5563;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-share-link:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+
+.share-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.share-feedback {
+  font-size: 12px;
+  color: #16a34a;
 }
 
 .date {

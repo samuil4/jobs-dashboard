@@ -19,6 +19,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/share/:jobId',
+      name: 'jobShare',
+      component: () => import('../views/JobShareView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/:catchAll(.*)',
       redirect: '/',
     },
