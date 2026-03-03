@@ -36,6 +36,7 @@ const historyEditModal = reactive({
   jobId: null as string | null,
   historyId: null as string | null,
   currentDelta: 0,
+  updateType: undefined as string | undefined,
 })
 const historyDeleteModal = reactive({
   show: false,
@@ -190,10 +191,20 @@ async function handleDelivery(jobId: string, delta: number) {
   }
 }
 
-function handleEditHistory(jobId: string, historyId: string, currentDelta: number) {
+async function handleAddFailedProduction(jobId: string, delta: number) {
+  try {
+    await jobsStore.addFailedProduction(jobId, delta, authStore.userId)
+  } catch (err) {
+    console.error(err)
+    alert(t('errors.updateProduction'))
+  }
+}
+
+function handleEditHistory(jobId: string, historyId: string, currentDelta: number, updateType?: string) {
   historyEditModal.jobId = jobId
   historyEditModal.historyId = historyId
   historyEditModal.currentDelta = currentDelta
+  historyEditModal.updateType = updateType
   historyEditModal.show = true
 }
 
@@ -202,6 +213,7 @@ function closeHistoryEditModal() {
   historyEditModal.jobId = null
   historyEditModal.historyId = null
   historyEditModal.currentDelta = 0
+  historyEditModal.updateType = undefined
 }
 
 async function handleSaveHistoryEdit(newDelta: number) {
@@ -291,6 +303,7 @@ const archiveConfirmLabel = computed(() =>
         @deleteHistory="handleDeleteHistory"
         @updateNotes="handleUpdateNotes"
         @delivery="handleDelivery"
+        @addFailedProduction="handleAddFailedProduction"
       />
     </div>
 
@@ -325,6 +338,7 @@ const archiveConfirmLabel = computed(() =>
     <HistoryEditModal
       :show="historyEditModal.show"
       :current-delta="historyEditModal.currentDelta"
+      :update-type="historyEditModal.updateType"
       @close="closeHistoryEditModal"
       @save="handleSaveHistoryEdit"
     />

@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import Toast from './components/Toast.vue'
 import { useAuthStore } from './stores/auth'
 import { useJobsStore } from './stores/jobs'
 
@@ -88,6 +89,7 @@ async function handleLogout() {
       <RouterView />
     </main>
 
+    <Toast />
     <footer v-if="showFooter" class="app-footer">
       <div class="footer-content">
         <LanguageSwitcher />

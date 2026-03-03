@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   show: boolean
   currentDelta: number
+  updateType?: string
 }>()
 
 const emit = defineEmits<{
@@ -13,6 +14,14 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const isFailedProduction = computed(() => props.updateType === 'failed_production')
+const editTitle = computed(() =>
+  isFailedProduction.value ? t('jobs.history.editFailedTitle') : t('jobs.history.editTitle')
+)
+const deltaLabel = computed(() =>
+  isFailedProduction.value ? t('jobs.history.deltaLabelFailed') : t('jobs.history.deltaLabel')
+)
 
 const form = reactive({
   delta: props.currentDelta,
@@ -58,7 +67,7 @@ function handleSubmit() {
   <div v-if="show" class="overlay" role="dialog" aria-modal="true">
     <div class="modal">
       <header class="modal-header">
-        <h2>{{ t('jobs.history.editTitle') }}</h2>
+        <h2>{{ editTitle }}</h2>
         <button class="btn btn-ghost" type="button" @click="handleClose">
           {{ t('common.close') }}
         </button>
@@ -66,7 +75,7 @@ function handleSubmit() {
 
       <form class="form" @submit.prevent="handleSubmit">
         <div>
-          <label for="history-delta">{{ t('jobs.history.deltaLabel') }}</label>
+          <label for="history-delta">{{ deltaLabel }}</label>
           <input
             id="history-delta"
             v-model.number="form.delta"

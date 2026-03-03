@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 
+import { useToastStore } from '../../stores/toast'
 import type { JobWithHistory } from '../../types/job'
 
 const router = useRouter()
@@ -17,18 +18,25 @@ const emit = defineEmits<{
   (e: 'archive', jobId: string, archived: boolean): void
   (e: 'delete', jobId: string): void
   (e: 'production', jobId: string, delta: number): void
-  (e: 'editHistory', jobId: string, historyId: string, currentDelta: number): void
+  (e: 'editHistory', jobId: string, historyId: string, currentDelta: number, updateType?: string): void
   (e: 'deleteHistory', jobId: string, historyId: string): void
   (e: 'updateNotes', jobId: string, notes: string | null): void
   (e: 'delivery', jobId: string, delta: number): void
+  (e: 'addFailedProduction', jobId: string, delta: number): void
 }>()
 
 const { t } = useI18n()
+const toastStore = useToastStore()
 const productionInput = ref<number | null>(null)
 const deliveryInput = ref<number | null>(null)
+const failedProductionInput = ref<number | null>(null)
 const notesInput = ref<string>('')
 const productionError = ref<string | null>(null)
 const deliveryError = ref<string | null>(null)
+const failedProductionError = ref<string | null>(null)
+const menuOpen = ref(false)
+const menuAnchorRef = ref<HTMLElement | null>(null)
+const failedProductionModalOpen = ref(false)
 
 watch(
   () => props.job.notes,
@@ -78,6 +86,9 @@ function formatHistoryEntry(delta: number, createdAt: string, updateType?: strin
   if (updateType === 'delivery') {
     return t('jobs.history.entryDelivered', { quantity: delta, date })
   }
+  if (updateType === 'failed_production') {
+    return t('jobs.history.entryFailed', { quantity: delta, date })
+  }
   return t('jobs.history.entry', { quantity: delta, date })
 }
 
@@ -110,17 +121,67 @@ async function handleDeliverySubmit() {
 const canShare = computed(() => Boolean(props.job.has_share_password))
 const shareLinkCopied = ref(false)
 
+const totalFailed = computed(() => props.job.parts_failed ?? 0)
+const failedPercent = computed(() => {
+  const totalProduction = totalProduced.value
+  const failed = totalFailed.value
+  const total = totalProduction + failed
+  return total > 0 ? Math.round((100 * failed) / total) : 0
+})
+
 function copyShareLink() {
-  if (!canShare.value) return
-  const url = `${window.location.origin}${router.resolve({ name: 'jobShare', params: { jobId: props.job.id } }).href}`
-  navigator.clipboard
-    .writeText(url)
-    .then(() => {
-      shareLinkCopied.value = true
-      setTimeout(() => { shareLinkCopied.value = false }, 2000)
-    })
-    .catch(() => {})
+  if (canShare.value) {
+    menuOpen.value = false
+    const url = `${window.location.origin}${router.resolve({ name: 'jobShare', params: { jobId: props.job.id } }).href}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        shareLinkCopied.value = true
+        setTimeout(() => { shareLinkCopied.value = false }, 2000)
+      })
+      .catch(() => {})
+    return
+  }
+  menuOpen.value = false
+  toastStore.show(t('jobs.setPasswordToShareHint'))
 }
+
+function openFailedProductionModal() {
+  menuOpen.value = false
+  failedProductionModalOpen.value = true
+  failedProductionError.value = null
+  failedProductionInput.value = null
+}
+
+function closeFailedProductionModal() {
+  failedProductionModalOpen.value = false
+  failedProductionError.value = null
+  failedProductionInput.value = null
+}
+
+function handleFailedProductionSubmit() {
+  failedProductionError.value = null
+  if (!failedProductionInput.value || failedProductionInput.value <= 0) {
+    failedProductionError.value = t('common.invalidNumber')
+    return
+  }
+  emit('addFailedProduction', props.job.id, failedProductionInput.value)
+  closeFailedProductionModal()
+}
+
+function onClickOutsideMenu(event: MouseEvent) {
+  const target = event.target as Node
+  if (menuOpen.value && menuAnchorRef.value && !menuAnchorRef.value.contains(target)) {
+    menuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', onClickOutsideMenu as EventListener)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onClickOutsideMenu as EventListener)
+})
 </script>
 
 <template>
@@ -132,24 +193,49 @@ function copyShareLink() {
           {{ t('jobs.assignee') }}: {{ job.assignee }}
         </p>
       </div>
-      <div class="status">
-        <button
-          v-if="canShare"
-          type="button"
-          class="btn-share-link"
-          :title="shareLinkCopied ? t('jobs.shareLinkCopied') : t('jobs.copyShareLink')"
-          :aria-label="shareLinkCopied ? t('jobs.shareLinkCopied') : t('jobs.copyShareLink')"
-          @click="copyShareLink"
-        >
-          <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-          </svg>
-          <span v-if="shareLinkCopied" class="share-feedback">{{ t('jobs.shareLinkCopied') }}</span>
-        </button>
+      <div ref="menuAnchorRef" class="status status-with-menu">
+        <div class="menu-wrapper">
+          <button
+            type="button"
+            class="btn-menu-trigger"
+            :aria-label="t('jobs.cardMenu')"
+            :aria-expanded="menuOpen"
+            @click.stop="menuOpen = !menuOpen"
+          >
+            <svg class="dots-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
+            </svg>
+          </button>
+          <div v-if="menuOpen" class="menu-dropdown" role="menu" @click.stop>
+            <button
+              type="button"
+              role="menuitem"
+              class="menu-item"
+              @click="copyShareLink"
+            >
+              <svg class="share-icon menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+              {{ shareLinkCopied ? t('jobs.shareLinkCopied') : t('jobs.copyShareLink') }}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class="menu-item menu-item-fail"
+              @click="openFailedProductionModal"
+            >
+              <svg class="menu-icon fail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              {{ t('jobs.addFailedProduction') }}
+            </button>
+          </div>
+        </div>
         <span :class="statusBadgeClass">
           {{ t(`jobs.status.${job.status}`) }}
         </span>
@@ -178,6 +264,10 @@ function copyShareLink() {
         <div class="stat-item">
           <span class="label">{{ t('jobs.delivered') }}:</span>
           <strong>{{ job.delivered ?? 0 }}</strong>
+        </div>
+        <div class="stat-item stat-item-failed">
+          <span class="label">{{ t('jobs.failed') }}:</span>
+          <strong>{{ totalFailed }} ({{ failedPercent }}%)</strong>
         </div>
       </div>
 
@@ -246,7 +336,7 @@ function copyShareLink() {
                 class="btn-icon"
                 type="button"
                 :title="t('jobs.history.edit')"
-                @click="emit('editHistory', job.id, update.id, update.delta)"
+                @click="emit('editHistory', job.id, update.id, update.delta, update.update_type)"
               >
                 {{ t('jobs.history.edit') }}
               </button>
@@ -287,6 +377,34 @@ function copyShareLink() {
         </button>
       </div>
     </footer>
+
+    <div v-if="failedProductionModalOpen" class="overlay" role="dialog" aria-modal="true" :aria-labelledby="`failed-modal-title-${job.id}`">
+      <div class="modal failed-production-modal">
+        <header class="modal-header">
+          <h2 :id="`failed-modal-title-${job.id}`">{{ t('jobs.failedProductionModalTitle') }}</h2>
+          <button class="btn btn-ghost" type="button" :aria-label="t('common.close')" @click="closeFailedProductionModal">
+            {{ t('common.close') }}
+          </button>
+        </header>
+        <form class="modal-form" @submit.prevent="handleFailedProductionSubmit">
+          <div class="production-form-row">
+            <input
+              :id="`failed-production-${job.id}`"
+              v-model.number="failedProductionInput"
+              type="number"
+              min="1"
+              :placeholder="t('jobs.addFailedProduction')"
+              :aria-label="t('jobs.addFailedProduction')"
+              class="production-input"
+            />
+            <button class="btn btn-primary" type="submit">
+              {{ t('jobs.addFailedProduction') }}
+            </button>
+          </div>
+          <p v-if="failedProductionError" class="error">{{ failedProductionError }}</p>
+        </form>
+      </div>
+    </div>
   </article>
 </template>
 
@@ -325,35 +443,97 @@ function copyShareLink() {
   gap: 8px;
 }
 
-.btn-share-link {
+.status-with-menu {
+  position: relative;
+}
+
+.menu-wrapper {
+  position: relative;
+}
+
+.btn-menu-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #fff;
   color: #4b5563;
   cursor: pointer;
-  font-size: 13px;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
-.btn-share-link:hover {
+.btn-menu-trigger:hover {
   background: #f3f4f6;
   border-color: #9ca3af;
   color: #1f2937;
+}
+
+.dots-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 180px;
+  padding: 6px 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background: #f3f4f6;
+}
+
+.menu-item-fail {
+  color: #dc2626;
+}
+
+.menu-item-fail .fail-icon {
+  color: #dc2626;
+}
+
+.menu-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.fail-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .share-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-}
-
-.share-feedback {
-  font-size: 12px;
-  color: #16a34a;
 }
 
 .date {
@@ -402,6 +582,11 @@ function copyShareLink() {
 
 .stat-item.overproduced strong {
   color: #2563eb;
+}
+
+.stat-item-failed .label,
+.stat-item-failed strong {
+  color: #dc2626;
 }
 
 .notes-section {
@@ -465,10 +650,46 @@ function copyShareLink() {
 }
 
 .production-form .error,
-.delivery-form .error {
+.delivery-form .error,
+.modal-form .error {
   color: #dc2626;
   font-size: 12px;
   margin: 8px 0 0;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.failed-production-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 0;
+  min-width: 320px;
+  max-width: 90vw;
+}
+
+.failed-production-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.failed-production-modal .modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.failed-production-modal .modal-form {
+  padding: 20px;
 }
 
 .history {

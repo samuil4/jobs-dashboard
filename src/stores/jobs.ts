@@ -40,7 +40,7 @@ export const useJobsStore = defineStore('jobs', () => {
     error.value = null
     const { data, error: fetchError } = await supabase
       .from('jobs')
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -73,6 +73,7 @@ export const useJobsStore = defineStore('jobs', () => {
       parts_overproduced: 0,
       notes: null,
       delivered: 0,
+      parts_failed: 0,
       archived: false,
       status: 'active',
       assignee: payload.assignee,
@@ -85,7 +86,7 @@ export const useJobsStore = defineStore('jobs', () => {
     const { data, error: insertError } = await supabase
       .from('jobs')
       .insert(insertPayload)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
       .single()
 
     if (insertError) {
@@ -146,7 +147,7 @@ export const useJobsStore = defineStore('jobs', () => {
       .from('jobs')
       .update(updatePayload)
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -177,7 +178,7 @@ export const useJobsStore = defineStore('jobs', () => {
         updated_at: formatISO(new Date()),
       })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -313,9 +314,9 @@ export const useJobsStore = defineStore('jobs', () => {
     parts_overproduced: number
     status: 'active' | 'completed' | 'archived'
   } {
-    // Sum deltas from production entries only (exclude delivery)
+    // Sum deltas from production entries only (exclude delivery and failed_production)
     const totalProduced = historyEntries
-      .filter((e) => e.update_type !== 'delivery')
+      .filter((e) => e.update_type === 'production')
       .reduce((sum, entry) => sum + entry.delta, 0)
 
     // Calculate parts_produced (capped at parts_needed)
@@ -349,6 +350,12 @@ export const useJobsStore = defineStore('jobs', () => {
       .reduce((sum, entry) => sum + entry.delta, 0)
   }
 
+  function recalculateJobFailed(historyEntries: JobUpdateRecord[]): number {
+    return historyEntries
+      .filter((e) => e.update_type === 'failed_production')
+      .reduce((sum, entry) => sum + entry.delta, 0)
+  }
+
   async function deleteHistoryItem(jobId: string, historyId: string) {
     error.value = null
     const job = jobs.value.find((j) => j.id === jobId)
@@ -373,6 +380,7 @@ export const useJobsStore = defineStore('jobs', () => {
     }
 
     const isDelivery = persistedEntry.update_type === 'delivery'
+    const isFailedProduction = persistedEntry.update_type === 'failed_production'
 
     // Delete the history entry from database
     const { error: deleteError } = await supabase.from('job_updates').delete().eq('id', historyId)
@@ -403,7 +411,25 @@ export const useJobsStore = defineStore('jobs', () => {
         .from('jobs')
         .update({ delivered: newDelivered, updated_at: now })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+        .single()
+
+      if (updateError) {
+        error.value = updateError.message
+        throw updateError
+      }
+
+      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      jobs.value = jobs.value.map((item) =>
+        item.id === jobId ? withHistory(rest, job_updates) : item
+      )
+    } else if (isFailedProduction) {
+      const newPartsFailed = recalculateJobFailed(historyEntries)
+      const { data: updatedJob, error: updateError } = await supabase
+        .from('jobs')
+        .update({ parts_failed: newPartsFailed, updated_at: now })
+        .eq('id', jobId)
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
         .single()
 
       if (updateError) {
@@ -430,7 +456,7 @@ export const useJobsStore = defineStore('jobs', () => {
           updated_at: now,
         })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
         .single()
 
       if (updateError) {
@@ -474,6 +500,7 @@ export const useJobsStore = defineStore('jobs', () => {
     }
 
     const isDelivery = persistedEntry.update_type === 'delivery'
+    const isFailedProduction = persistedEntry.update_type === 'failed_production'
 
     // Update the history entry in database
     const { error: updateError } = await supabase
@@ -507,7 +534,25 @@ export const useJobsStore = defineStore('jobs', () => {
         .from('jobs')
         .update({ delivered: newDelivered, updated_at: now })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+        .single()
+
+      if (jobUpdateError) {
+        error.value = jobUpdateError.message
+        throw jobUpdateError
+      }
+
+      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      jobs.value = jobs.value.map((item) =>
+        item.id === jobId ? withHistory(rest, job_updates) : item
+      )
+    } else if (isFailedProduction) {
+      const newPartsFailed = recalculateJobFailed(historyEntries)
+      const { data: updatedJob, error: jobUpdateError } = await supabase
+        .from('jobs')
+        .update({ parts_failed: newPartsFailed, updated_at: now })
+        .eq('id', jobId)
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
         .single()
 
       if (jobUpdateError) {
@@ -534,7 +579,7 @@ export const useJobsStore = defineStore('jobs', () => {
           updated_at: now,
         })
         .eq('id', jobId)
-        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+        .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
         .single()
 
       if (jobUpdateError) {
@@ -566,7 +611,7 @@ export const useJobsStore = defineStore('jobs', () => {
       .from('jobs')
       .update({ notes: trimmed, updated_at: now })
       .eq('id', id)
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
+      .select('id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)')
       .single()
 
     if (updateError) {
@@ -598,7 +643,9 @@ export const useJobsStore = defineStore('jobs', () => {
       job_id: o.job_id,
       delta: o.delta,
       update_type:
-        o.update_type === 'delivery' || o.update_type === 'production'
+        o.update_type === 'delivery' ||
+        o.update_type === 'production' ||
+        o.update_type === 'failed_production'
           ? o.update_type
           : undefined,
       created_at: o.created_at,
@@ -649,6 +696,43 @@ export const useJobsStore = defineStore('jobs', () => {
     })
   }
 
+  async function addFailedProduction(id: string, delta: number, updatedBy?: string | null) {
+    error.value = null
+    const job = jobs.value.find((j) => j.id === id)
+    if (!job) {
+      throw new Error('Job not found')
+    }
+    if (delta <= 0) {
+      throw new Error('Delta must be positive')
+    }
+    const now = formatISO(new Date())
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('add_failed_production', {
+      p_job_id: id,
+      p_delta: delta,
+      p_updated_by: updatedBy ?? null,
+      p_created_at: now,
+    })
+
+    if (rpcError) {
+      error.value = rpcError.message
+      throw rpcError
+    }
+
+    const newHistoryRecord = parseJobUpdateRecord(rpcData)
+    const newPartsFailed = (job.parts_failed ?? 0) + delta
+
+    jobs.value = jobs.value.map((item) => {
+      if (item.id !== id) return item
+      return {
+        ...item,
+        parts_failed: newPartsFailed,
+        updated_at: now,
+        job_updates: [newHistoryRecord, ...item.job_updates],
+      }
+    })
+  }
+
   return {
     jobs,
     loading,
@@ -667,6 +751,7 @@ export const useJobsStore = defineStore('jobs', () => {
     updateHistoryItem,
     updateJobNotes,
     addDelivery,
+    addFailedProduction,
     setSearch,
     setStatus,
     toggleArchivedVisibility,
