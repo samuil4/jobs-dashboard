@@ -41,6 +41,7 @@ export default {
     addFailedProduction: 'Add failed production',
     failedProductionModalTitle: 'Add failed production',
     shareLinkCopied: 'Link copied',
+    copyShareLinkFailed: 'Failed to copy share link to clipboard.',
     setPasswordToShareHint: 'Set a job password in job settings to enable sharing.',
     sharePassword: 'Client share password',
     sharePasswordSet: 'Password set',

@@ -19,8 +19,17 @@ export const useToastStore = defineStore('toast', () => {
     }, TOAST_DURATION_MS)
   }
 
+  function hide() {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+    message.value = null
+  }
+
   return {
     message,
     show,
+    hide,
   }
 })

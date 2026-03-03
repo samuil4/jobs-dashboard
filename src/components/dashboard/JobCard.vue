@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 
 import { useToastStore } from '../../stores/toast'
-import type { JobWithHistory } from '../../types/job'
+import type { JobWithHistory, UpdateType } from '../../types/job'
 
 const router = useRouter()
 
@@ -18,7 +18,7 @@ const emit = defineEmits<{
   (e: 'archive', jobId: string, archived: boolean): void
   (e: 'delete', jobId: string): void
   (e: 'production', jobId: string, delta: number): void
-  (e: 'editHistory', jobId: string, historyId: string, currentDelta: number, updateType?: string): void
+  (e: 'editHistory', jobId: string, historyId: string, currentDelta: number, updateType?: UpdateType): void
   (e: 'deleteHistory', jobId: string, historyId: string): void
   (e: 'updateNotes', jobId: string, notes: string | null): void
   (e: 'delivery', jobId: string, delta: number): void
@@ -139,7 +139,9 @@ function copyShareLink() {
         shareLinkCopied.value = true
         setTimeout(() => { shareLinkCopied.value = false }, 2000)
       })
-      .catch(() => {})
+      .catch(() => {
+        toastStore.show(t('jobs.copyShareLinkFailed'))
+      })
     return
   }
   menuOpen.value = false
@@ -194,6 +196,9 @@ onUnmounted(() => {
         </p>
       </div>
       <div ref="menuAnchorRef" class="status status-with-menu">
+        <span :class="statusBadgeClass">
+          {{ t(`jobs.status.${job.status}`) }}
+        </span>
         <div class="menu-wrapper">
           <button
             type="button"
@@ -236,9 +241,6 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <span :class="statusBadgeClass">
-          {{ t(`jobs.status.${job.status}`) }}
-        </span>
         <span class="date">{{ t('jobs.dateAdded') }}: {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span>
       </div>
     </header>

@@ -41,6 +41,7 @@ export default {
     addFailedProduction: 'Добави неуспешно производство',
     failedProductionModalTitle: 'Добави неуспешно производство',
     shareLinkCopied: 'Линкът е копиран',
+    copyShareLinkFailed: 'Неуспешно копиране на линка в клипборда.',
     setPasswordToShareHint: 'Задайте парола за заданието в настройките, за да активирате споделяне.',
     sharePassword: 'Парола за клиентски преглед',
     sharePasswordSet: 'Парола зададена',

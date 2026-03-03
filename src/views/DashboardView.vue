@@ -9,7 +9,7 @@ import JobCard from '../components/dashboard/JobCard.vue'
 import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useJobsStore } from '../stores/jobs'
-import type { Assignee } from '../types/job'
+import type { Assignee, UpdateType } from '../types/job'
 
 const jobsStore = useJobsStore()
 const authStore = useAuthStore()
@@ -36,7 +36,7 @@ const historyEditModal = reactive({
   jobId: null as string | null,
   historyId: null as string | null,
   currentDelta: 0,
-  updateType: undefined as string | undefined,
+  updateType: undefined as UpdateType | undefined,
 })
 const historyDeleteModal = reactive({
   show: false,
@@ -200,7 +200,7 @@ async function handleAddFailedProduction(jobId: string, delta: number) {
   }
 }
 
-function handleEditHistory(jobId: string, historyId: string, currentDelta: number, updateType?: string) {
+function handleEditHistory(jobId: string, historyId: string, currentDelta: number, updateType?: UpdateType) {
   historyEditModal.jobId = jobId
   historyEditModal.historyId = historyId
   historyEditModal.currentDelta = currentDelta

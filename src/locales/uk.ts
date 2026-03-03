@@ -41,6 +41,7 @@ export default {
     addFailedProduction: 'Додати брак',
     failedProductionModalTitle: 'Додати браковане виробництво',
     shareLinkCopied: 'Посилання скопійовано',
+    copyShareLinkFailed: 'Не вдалося скопіювати посилання в буфер обміну.',
     setPasswordToShareHint: 'Встановіть пароль завдання в налаштуваннях, щоб увімкнути поширення.',
     sharePassword: 'Пароль для клієнтського перегляду',
     sharePasswordSet: 'Пароль встановлено',
