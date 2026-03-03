@@ -9,7 +9,7 @@ import JobCard from '../components/dashboard/JobCard.vue'
 import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useJobsStore } from '../stores/jobs'
-import type { Assignee } from '../types/job'
+import type { Assignee, UpdateType } from '../types/job'
 
 const jobsStore = useJobsStore()
 const authStore = useAuthStore()
@@ -36,6 +36,7 @@ const historyEditModal = reactive({
   jobId: null as string | null,
   historyId: null as string | null,
   currentDelta: 0,
+  updateType: undefined as UpdateType | undefined,
 })
 const historyDeleteModal = reactive({
   show: false,
@@ -190,10 +191,30 @@ async function handleDelivery(jobId: string, delta: number) {
   }
 }
 
-function handleEditHistory(jobId: string, historyId: string, currentDelta: number) {
+async function handleAddFailedProduction(
+  jobId: string,
+  delta: number,
+  callbacks?: { onSuccess: () => void; onError: (message: string) => void }
+) {
+  try {
+    await jobsStore.addFailedProduction(jobId, delta, authStore.userId)
+    callbacks?.onSuccess?.()
+  } catch (err) {
+    console.error(err)
+    const message = err instanceof Error ? err.message : t('errors.addFailedProduction')
+    if (callbacks?.onError) {
+      callbacks.onError(message)
+    } else {
+      alert(t('errors.addFailedProduction'))
+    }
+  }
+}
+
+function handleEditHistory(jobId: string, historyId: string, currentDelta: number, updateType?: UpdateType) {
   historyEditModal.jobId = jobId
   historyEditModal.historyId = historyId
   historyEditModal.currentDelta = currentDelta
+  historyEditModal.updateType = updateType
   historyEditModal.show = true
 }
 
@@ -202,6 +223,7 @@ function closeHistoryEditModal() {
   historyEditModal.jobId = null
   historyEditModal.historyId = null
   historyEditModal.currentDelta = 0
+  historyEditModal.updateType = undefined
 }
 
 async function handleSaveHistoryEdit(newDelta: number) {
@@ -291,6 +313,7 @@ const archiveConfirmLabel = computed(() =>
         @deleteHistory="handleDeleteHistory"
         @updateNotes="handleUpdateNotes"
         @delivery="handleDelivery"
+        @addFailedProduction="handleAddFailedProduction"
       />
     </div>
 
@@ -325,6 +348,7 @@ const archiveConfirmLabel = computed(() =>
     <HistoryEditModal
       :show="historyEditModal.show"
       :current-delta="historyEditModal.currentDelta"
+      :update-type="historyEditModal.updateType"
       @close="closeHistoryEditModal"
       @save="handleSaveHistoryEdit"
     />

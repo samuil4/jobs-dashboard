@@ -10,6 +10,7 @@ export interface JobRecord {
   parts_overproduced: number
   notes: string | null
   delivered: number
+  parts_failed: number
   archived: boolean
   status: JobStatus
   assignee: Assignee
@@ -22,7 +23,7 @@ export interface JobWithHistory extends JobRecord {
   job_updates: JobUpdateRecord[]
 }
 
-export type UpdateType = 'production' | 'delivery'
+export type UpdateType = 'production' | 'delivery' | 'failed_production'
 
 export interface JobUpdateRecord {
   id: string
