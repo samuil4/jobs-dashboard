@@ -22,7 +22,12 @@ const emit = defineEmits<{
   (e: 'deleteHistory', jobId: string, historyId: string): void
   (e: 'updateNotes', jobId: string, notes: string | null): void
   (e: 'delivery', jobId: string, delta: number): void
-  (e: 'addFailedProduction', jobId: string, delta: number): void
+  (
+    e: 'addFailedProduction',
+    jobId: string,
+    delta: number,
+    callbacks?: { onSuccess: () => void; onError: (message: string) => void }
+  ): void
 }>()
 
 const { t } = useI18n()
@@ -167,8 +172,12 @@ function handleFailedProductionSubmit() {
     failedProductionError.value = t('common.invalidNumber')
     return
   }
-  emit('addFailedProduction', props.job.id, failedProductionInput.value)
-  closeFailedProductionModal()
+  emit('addFailedProduction', props.job.id, failedProductionInput.value, {
+    onSuccess: () => closeFailedProductionModal(),
+    onError: (message: string) => {
+      failedProductionError.value = message
+    },
+  })
 }
 
 function onClickOutsideMenu(event: MouseEvent) {

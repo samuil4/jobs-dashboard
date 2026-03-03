@@ -126,6 +126,7 @@ export default {
     updateJob: 'Could not update job. Try again.',
     deleteJob: 'Could not delete job. Try again.',
     updateProduction: 'Failed to update production.',
+    addFailedProduction: 'Failed to add failed production.',
     invalidDelivered: 'Delivered must be a non-negative number.',
     deliveredExceedsProduced: 'Delivered cannot exceed total parts produced.',
   },

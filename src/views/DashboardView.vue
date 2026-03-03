@@ -191,12 +191,22 @@ async function handleDelivery(jobId: string, delta: number) {
   }
 }
 
-async function handleAddFailedProduction(jobId: string, delta: number) {
+async function handleAddFailedProduction(
+  jobId: string,
+  delta: number,
+  callbacks?: { onSuccess: () => void; onError: (message: string) => void }
+) {
   try {
     await jobsStore.addFailedProduction(jobId, delta, authStore.userId)
+    callbacks?.onSuccess?.()
   } catch (err) {
     console.error(err)
-    alert(t('errors.updateProduction'))
+    const message = err instanceof Error ? err.message : t('errors.addFailedProduction')
+    if (callbacks?.onError) {
+      callbacks.onError(message)
+    } else {
+      alert(t('errors.addFailedProduction'))
+    }
   }
 }
 
