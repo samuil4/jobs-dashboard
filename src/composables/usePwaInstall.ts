@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, readonly } from 'vue'
 
 export interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[]
@@ -24,26 +24,41 @@ function handleAppInstalled() {
 }
 
 if (typeof window !== 'undefined') {
+  window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.removeEventListener('appinstalled', handleAppInstalled)
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('appinstalled', handleAppInstalled)
 }
 
+const isInstalling = ref(false)
+
 export function usePwaInstall() {
   const canInstall = computed(() => !!installPromptEvent.value)
 
-  async function install() {
-    if (!installPromptEvent.value) return
-    await installPromptEvent.value.prompt()
-    const { outcome } = await installPromptEvent.value.userChoice
-    if (outcome === 'accepted') {
-      installPromptEvent.value = null
-      isInstalled.value = true
+  async function install(): Promise<boolean> {
+    if (!installPromptEvent.value) return false
+    isInstalling.value = true
+    try {
+      await installPromptEvent.value.prompt()
+      const { outcome } = await installPromptEvent.value.userChoice
+      if (outcome === 'accepted') {
+        installPromptEvent.value = null
+        isInstalled.value = true
+        return true
+      }
+      return false
+    } catch (err) {
+      console.warn('PWA install failed:', err)
+      return false
+    } finally {
+      isInstalling.value = false
     }
   }
 
   return {
     canInstall,
-    isInstalled,
+    isInstalled: readonly(isInstalled),
+    isInstalling,
     install,
   }
 }

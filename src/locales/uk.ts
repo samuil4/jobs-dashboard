@@ -21,6 +21,7 @@ export default {
   },
   pwa: {
     install: 'Встановити застосунок',
+    installing: 'Встановлення…',
   },
   navigation: {
     dashboard: 'Головна',

@@ -21,6 +21,7 @@ export default {
   },
   pwa: {
     install: 'Install app',
+    installing: 'Installing…',
   },
   navigation: {
     dashboard: 'Dashboard',
