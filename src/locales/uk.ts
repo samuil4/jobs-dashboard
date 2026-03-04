@@ -19,6 +19,10 @@ export default {
     error: 'Невірні дані. Спробуйте ще раз.',
     logout: 'Вийти',
   },
+  pwa: {
+    install: 'Встановити застосунок',
+    installing: 'Встановлення…',
+  },
   navigation: {
     dashboard: 'Головна',
     archived: 'Архів',

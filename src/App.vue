@@ -6,10 +6,12 @@ import { useI18n } from 'vue-i18n'
 
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
 import Toast from './components/Toast.vue'
+import { usePwaInstall } from './composables/usePwaInstall'
 import { useAuthStore } from './stores/auth'
 import { useJobsStore } from './stores/jobs'
 
 const authStore = useAuthStore()
+const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
 const jobsStore = useJobsStore()
 const route = useRoute()
 const router = useRouter()
@@ -93,6 +95,15 @@ async function handleLogout() {
     <footer v-if="showFooter" class="app-footer">
       <div class="footer-content">
         <LanguageSwitcher />
+        <button
+          v-if="canInstall && !isInstalled"
+          class="btn btn-compact btn-secondary"
+          type="button"
+          :disabled="isInstalling"
+          @click="install"
+        >
+          {{ isInstalling ? t('pwa.installing') : t('pwa.install') }}
+        </button>
         <button class="btn btn-compact btn-secondary" type="button" @click="handleLogout">
           {{ t('auth.logout') }}
         </button>

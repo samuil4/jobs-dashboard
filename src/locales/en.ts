@@ -19,6 +19,10 @@ export default {
     error: 'Invalid credentials. Please try again.',
     logout: 'Log out',
   },
+  pwa: {
+    install: 'Install app',
+    installing: 'Installing…',
+  },
   navigation: {
     dashboard: 'Dashboard',
     archived: 'Archived',
