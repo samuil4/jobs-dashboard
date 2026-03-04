@@ -19,6 +19,9 @@ export default {
     error: 'Невалидни данни за вход. Опитайте отново.',
     logout: 'Изход',
   },
+  pwa: {
+    install: 'Инсталиране на приложението',
+  },
   navigation: {
     dashboard: 'Табло',
     archived: 'Архивирани',
