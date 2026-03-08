@@ -331,7 +331,6 @@ export const useJobsStore = defineStore('jobs', () => {
         partsOverproduced = Math.max(0, newTotal - item.parts_needed)
       } else if (updateType === 'delivery') {
         delivered += update.delta
-        delivered = Math.min(delivered, partsProduced + partsOverproduced)
       } else if (updateType === 'failed_production') {
         partsFailed += update.delta
       }
