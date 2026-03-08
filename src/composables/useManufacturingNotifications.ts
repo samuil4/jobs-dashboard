@@ -61,7 +61,7 @@ export function useManufacturingNotifications() {
         updated_by: record.updated_by,
         note: record.note,
       }
-      job.job_updates = [newUpdate, ...job.job_updates]
+      jobsStore.mergeJobUpdate(record.job_id, newUpdate)
     }
   }
 

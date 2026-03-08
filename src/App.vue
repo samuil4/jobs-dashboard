@@ -33,21 +33,15 @@ const { t } = useI18n()
 const { searchTerm, statusFilter, showArchived } = storeToRefs(jobsStore)
 
 const showHeader = computed(
-  () =>
-    authStore.isAuthenticated &&
-    route.name !== 'login' &&
-    route.name !== 'jobShare'
+  () => authStore.isAuthenticated && route.name !== 'login' && route.name !== 'jobShare',
 )
 const showFooter = computed(
-  () =>
-    authStore.isAuthenticated &&
-    route.name !== 'login' &&
-    route.name !== 'jobShare'
+  () => authStore.isAuthenticated && route.name !== 'login' && route.name !== 'jobShare',
 )
 const isDashboard = computed(() => route.name === 'dashboard')
 
 const archivedToggleLabel = computed(() =>
-  showArchived.value ? t('jobs.filter.hideArchived') : t('jobs.filter.showArchived')
+  showArchived.value ? t('jobs.filter.hideArchived') : t('jobs.filter.showArchived'),
 )
 
 // Provide ref for openCreateModal function (to be set by DashboardView)
@@ -75,7 +69,7 @@ watch(
     if (isAuth && webPushSupported) {
       checkWebPushSubscription()
     }
-  }
+  },
 )
 
 async function handleEnablePush() {
@@ -111,7 +105,11 @@ async function handleLogout() {
             <option value="completed">{{ t('jobs.filter.completed') }}</option>
             <option value="archived">{{ t('jobs.filter.archived') }}</option>
           </select>
-          <button class="btn btn-compact btn-secondary" type="button" @click="jobsStore.toggleArchivedVisibility">
+          <button
+            class="btn btn-compact btn-secondary"
+            type="button"
+            @click="jobsStore.toggleArchivedVisibility"
+          >
             {{ archivedToggleLabel }}
           </button>
           <button class="btn btn-compact btn-primary" type="button" @click="handleAddJob">
