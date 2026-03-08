@@ -9,6 +9,8 @@ Manufacturing jobs dashboard built with Vue 3 + Vite. Tracks production targets,
 - Automatic completion state when produced equals required.
 - History timeline for every job update.
 - Filter/search by status, archived state or keyword.
+- Real-time in-app notifications when parts are produced, delivered, or failed (Supabase Realtime).
+- Optional push notifications when the app is minimized or closed (Web Push via Edge Function).
 - Client share links: password-protected read-only job view at `/share/:jobId` for non-registered users (parts needed, parts produced, parts ready for delivery). Access TTL 72 hours.
 - Simple username/password login (Supabase auth), plus logout.
 - CSV seeding script to bootstrap data from `reference/uchet_izdeliy.csv`.
@@ -197,6 +199,22 @@ The function requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (set as sec
 
 3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
 
+### Manufacturing Notifications (Optional)
+
+The app shows real-time in-app toasts when parts are produced, delivered, or failed. When the app is minimized, OS-level push notifications are supported.
+
+**In-app notifications (Realtime):** Run the migration `supabase/migrations/0004_realtime_job_updates.sql` to enable Supabase Realtime on `job_updates`.
+
+**Push notifications (when app is minimized):**
+
+1. Run migration `supabase/migrations/0005_push_subscriptions.sql`.
+2. Generate VAPID keys: `npm run vapid-keys` (or `node scripts/generate-vapid-keys.mjs`). No Deno needed — uses npx deno internally. Saves the JSON output and the application server key.
+3. Set secrets:
+   - `VAPID_KEYS_JSON`: the full JSON output (for the Edge Function).
+   - Add `VITE_VAPID_PUBLIC_KEY` to your client env (the application server key from stderr).
+4. Deploy the Edge Function: `supabase functions deploy send-manufacturing-push --no-verify-jwt`
+5. Create a Database Webhook in Supabase Dashboard: **Database Webhooks** → Create webhook on `public.job_updates` INSERT → Target Edge Function `send-manufacturing-push`.
+
 ## Environment Variables
 
 Create a `.env.local` file in the project root:
@@ -206,6 +224,8 @@ VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 # Optional: change the email domain used to map usernames to Supabase email addresses
 VITE_SUPABASE_AUTH_EMAIL_DOMAIN=example.com
+# Optional: for push notifications when app is minimized (see Manufacturing Notifications)
+VITE_VAPID_PUBLIC_KEY=your-vapid-public-key-base64url
 ```
 
 For seeding you also need (can be placed in shell env):

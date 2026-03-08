@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { computed, onMounted, provide, ref } from 'vue'
+import { computed, onMounted, provide, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
 import Toast from './components/Toast.vue'
+import { Toaster, toast } from 'vue-sonner'
+import { useManufacturingNotifications } from './composables/useManufacturingNotifications'
 import { usePwaInstall } from './composables/usePwaInstall'
+import { useWebPush } from './composables/useWebPush'
 import { useAuthStore } from './stores/auth'
 import { useJobsStore } from './stores/jobs'
 
 const authStore = useAuthStore()
 const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
+const {
+  isSupported: webPushSupported,
+  isSubscribed: webPushSubscribed,
+  isSubscribing: webPushSubscribing,
+  error: webPushError,
+  subscribe: subscribeWebPush,
+  checkSubscription: checkWebPushSubscription,
+} = useWebPush()
+
+useManufacturingNotifications()
 const jobsStore = useJobsStore()
 const route = useRoute()
 const router = useRouter()
@@ -51,7 +64,28 @@ function handleAddJob() {
 onMounted(async () => {
   if (!authStore.loading) return
   await authStore.init()
+  if (authStore.isAuthenticated && webPushSupported) {
+    checkWebPushSubscription()
+  }
 })
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth && webPushSupported) {
+      checkWebPushSubscription()
+    }
+  }
+)
+
+async function handleEnablePush() {
+  const ok = await subscribeWebPush()
+  if (!ok && webPushError.value) {
+    toast.error(webPushError.value)
+  } else if (ok) {
+    toast.success(t('webPush.enabled'))
+  }
+}
 
 async function handleLogout() {
   await authStore.signOut()
@@ -92,6 +126,7 @@ async function handleLogout() {
     </main>
 
     <Toast />
+    <Toaster richColors position="top-center" />
     <footer v-if="showFooter" class="app-footer">
       <div class="footer-content">
         <LanguageSwitcher />
@@ -103,6 +138,16 @@ async function handleLogout() {
           @click="install"
         >
           {{ isInstalling ? t('pwa.installing') : t('pwa.install') }}
+        </button>
+        <button
+          v-if="webPushSupported && !webPushSubscribed"
+          class="btn btn-compact btn-secondary"
+          type="button"
+          :disabled="webPushSubscribing"
+          :title="webPushError ?? undefined"
+          @click="handleEnablePush"
+        >
+          {{ webPushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
         </button>
         <button class="btn btn-compact btn-secondary" type="button" @click="handleLogout">
           {{ t('auth.logout') }}
