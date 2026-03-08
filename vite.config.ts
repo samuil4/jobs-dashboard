@@ -11,7 +11,17 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
       manifest: {
         name: 'Jobs Dashboard',
         short_name: 'Jobs Dashboard',

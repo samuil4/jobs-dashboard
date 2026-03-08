@@ -23,6 +23,11 @@ export default {
     install: 'Инсталиране на приложението',
     installing: 'Инсталиране…',
   },
+  webPush: {
+    enable: 'Включи известия',
+    enabling: 'Включване…',
+    enabled: 'Известията са включени',
+  },
   navigation: {
     dashboard: 'Табло',
     archived: 'Архивирани',
@@ -134,6 +139,11 @@ export default {
     addFailedProduction: 'Неуспешно добавяне на неуспешно производство.',
     invalidDelivered: 'Доставените трябва да са неотрицателно число.',
     deliveredExceedsProduced: 'Доставените не могат да надвишават общо произведените.',
+  },
+  notifications: {
+    production: 'Задание {name}: +{delta} детайла произведени',
+    delivery: 'Задание {name}: +{delta} детайла доставени',
+    failedProduction: 'Задание {name}: +{delta} детайла неуспешни',
   },
   share: {
     title: 'Статус на заданието',

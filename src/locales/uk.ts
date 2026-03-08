@@ -23,6 +23,11 @@ export default {
     install: 'Встановити застосунок',
     installing: 'Встановлення…',
   },
+  webPush: {
+    enable: 'Увімкнути сповіщення',
+    enabling: 'Увімкнення…',
+    enabled: 'Сповіщення увімкнено',
+  },
   navigation: {
     dashboard: 'Головна',
     archived: 'Архів',
@@ -134,6 +139,11 @@ export default {
     addFailedProduction: 'Не вдалося додати браковане виробництво.',
     invalidDelivered: 'Доставлено має бути невід\'ємним числом.',
     deliveredExceedsProduced: 'Доставлено не може перевищувати загальну кількість вироблених.',
+  },
+  notifications: {
+    production: 'Завдання {name}: +{delta} деталей виготовлено',
+    delivery: 'Завдання {name}: +{delta} деталей доставлено',
+    failedProduction: 'Завдання {name}: +{delta} бракованих деталей',
   },
   share: {
     title: 'Статус завдання',

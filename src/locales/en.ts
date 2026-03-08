@@ -23,6 +23,11 @@ export default {
     install: 'Install app',
     installing: 'Installing…',
   },
+  webPush: {
+    enable: 'Enable notifications',
+    enabling: 'Enabling…',
+    enabled: 'Notifications enabled',
+  },
   navigation: {
     dashboard: 'Dashboard',
     archived: 'Archived',
@@ -133,6 +138,11 @@ export default {
     addFailedProduction: 'Failed to add failed production.',
     invalidDelivered: 'Delivered must be a non-negative number.',
     deliveredExceedsProduced: 'Delivered cannot exceed total parts produced.',
+  },
+  notifications: {
+    production: 'Job {name}: +{delta} parts produced',
+    delivery: 'Job {name}: +{delta} parts delivered',
+    failedProduction: 'Job {name}: +{delta} parts failed',
   },
   share: {
     title: 'Job status',

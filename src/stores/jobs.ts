@@ -309,6 +309,51 @@ export const useJobsStore = defineStore('jobs', () => {
     showArchived.value = !showArchived.value
   }
 
+  function mergeJobUpdate(jobId: string, update: JobUpdateRecord) {
+    jobs.value = jobs.value.map((item) => {
+      if (item.id !== jobId) return item
+      // Avoid duplicate: same update may already exist (e.g. from fetchJobs race)
+      if (item.job_updates.some((u) => u.id === update.id)) return item
+      const newHistory = [update, ...item.job_updates]
+
+      // Incremental update: apply the new update's delta to current values instead of
+      // recalculating from full history (avoids mismatch from history representation issues)
+      const updateType = update.update_type ?? 'production'
+      let partsProduced = item.parts_produced
+      let partsOverproduced = item.parts_overproduced ?? 0
+      let delivered = item.delivered ?? 0
+      let partsFailed = item.parts_failed ?? 0
+
+      if (updateType === 'production') {
+        const currentTotal = partsProduced + partsOverproduced
+        const newTotal = currentTotal + update.delta
+        partsProduced = Math.min(newTotal, item.parts_needed)
+        partsOverproduced = Math.max(0, newTotal - item.parts_needed)
+      } else if (updateType === 'delivery') {
+        delivered += update.delta
+      } else if (updateType === 'failed_production') {
+        partsFailed += update.delta
+      }
+
+      const status = item.archived
+        ? ('archived' as const)
+        : partsProduced >= item.parts_needed
+          ? ('completed' as const)
+          : ('active' as const)
+
+      return {
+        ...item,
+        parts_produced: partsProduced,
+        parts_overproduced: partsOverproduced,
+        status,
+        delivered,
+        parts_failed: partsFailed,
+        updated_at: update.created_at,
+        job_updates: newHistory,
+      }
+    })
+  }
+
   function recalculateJobProduction(
     historyEntries: JobUpdateRecord[],
     job: JobRecord
@@ -755,6 +800,7 @@ export const useJobsStore = defineStore('jobs', () => {
     updateJobNotes,
     addDelivery,
     addFailedProduction,
+    mergeJobUpdate,
     setSearch,
     setStatus,
     toggleArchivedVisibility,

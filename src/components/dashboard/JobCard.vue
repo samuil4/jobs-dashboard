@@ -131,7 +131,7 @@ const failedPercent = computed(() => {
   const totalProduction = totalProduced.value
   const failed = totalFailed.value
   const total = totalProduction + failed
-  return total > 0 ? Math.round((100 * failed) / total) : 0
+  return total > 0 ? (100 * failed / total).toFixed(2) : '0.00'
 })
 
 function copyShareLink() {
