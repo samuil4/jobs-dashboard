@@ -8,6 +8,7 @@ export default {
     required: "Поле обов'язкове",
     invalidNumber: 'Введіть додатне число',
     language: 'Мова',
+    version: 'Версія',
   },
   auth: {
     title: 'Панель завдань',

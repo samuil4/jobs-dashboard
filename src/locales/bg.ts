@@ -8,6 +8,7 @@ export default {
     required: 'Полето е задължително',
     invalidNumber: 'Въведете положително число',
     language: 'Език',
+    version: 'Версия',
   },
   auth: {
     title: 'Табло за задания',

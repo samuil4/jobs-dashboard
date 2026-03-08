@@ -8,6 +8,7 @@ export default {
     required: 'This field is required',
     invalidNumber: 'Enter a positive number',
     language: 'Language',
+    version: 'Version',
   },
   auth: {
     title: 'Jobs dashboard',

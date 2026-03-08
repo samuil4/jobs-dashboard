@@ -31,6 +31,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 const { searchTerm, statusFilter, showArchived } = storeToRefs(jobsStore)
+const appVersion = __APP_VERSION__
 
 const showHeader = computed(
   () => authStore.isAuthenticated && route.name !== 'login' && route.name !== 'jobShare',
@@ -127,29 +128,37 @@ async function handleLogout() {
     <Toaster richColors position="top-center" />
     <footer v-if="showFooter" class="app-footer">
       <div class="footer-content">
-        <LanguageSwitcher />
-        <button
-          v-if="canInstall && !isInstalled"
-          class="btn btn-compact btn-secondary"
-          type="button"
-          :disabled="isInstalling"
-          @click="install"
+        <span
+          class="app-version"
+          :title="`${t('common.version')} ${appVersion}`"
         >
-          {{ isInstalling ? t('pwa.installing') : t('pwa.install') }}
-        </button>
-        <button
-          v-if="webPushSupported && !webPushSubscribed"
-          class="btn btn-compact btn-secondary"
-          type="button"
-          :disabled="webPushSubscribing"
-          :title="webPushError ?? undefined"
-          @click="handleEnablePush"
-        >
-          {{ webPushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
-        </button>
-        <button class="btn btn-compact btn-secondary" type="button" @click="handleLogout">
-          {{ t('auth.logout') }}
-        </button>
+          v{{ appVersion }}
+        </span>
+        <div class="footer-actions">
+          <LanguageSwitcher />
+          <button
+            v-if="canInstall && !isInstalled"
+            class="btn btn-compact btn-secondary"
+            type="button"
+            :disabled="isInstalling"
+            @click="install"
+          >
+            {{ isInstalling ? t('pwa.installing') : t('pwa.install') }}
+          </button>
+          <button
+            v-if="webPushSupported && !webPushSubscribed"
+            class="btn btn-compact btn-secondary"
+            type="button"
+            :disabled="webPushSubscribing"
+            :title="webPushError ?? undefined"
+            @click="handleEnablePush"
+          >
+            {{ webPushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
+          </button>
+          <button class="btn btn-compact btn-secondary" type="button" @click="handleLogout">
+            {{ t('auth.logout') }}
+          </button>
+        </div>
       </div>
     </footer>
   </div>
@@ -234,9 +243,21 @@ async function handleLogout() {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 12px;
   height: 100%;
+}
+
+.app-version {
+  font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 @media (max-width: 768px) {
@@ -262,6 +283,10 @@ async function handleLogout() {
   }
 
   .footer-content {
+    gap: 8px;
+  }
+
+  .footer-actions {
     gap: 8px;
   }
 
