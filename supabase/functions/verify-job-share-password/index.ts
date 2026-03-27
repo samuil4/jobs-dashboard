@@ -64,6 +64,32 @@ Deno.serve(async (req) => {
       )
     }
 
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+    const { data: tokenRow, error: tokenError } = await supabase
+      .from('share_tokens')
+      .insert({
+        job_id: job.id,
+        expires_at: expiresAt,
+      })
+      .select('token')
+      .single()
+
+    if (tokenError) {
+      console.error('share_tokens insert error:', tokenError)
+      return new Response(
+        JSON.stringify({ valid: false, error: 'Internal error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const shareToken = tokenRow?.token
+    if (!shareToken) {
+      return new Response(
+        JSON.stringify({ valid: false, error: 'Internal error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const payload = {
       valid: true,
       job: {
@@ -74,6 +100,7 @@ Deno.serve(async (req) => {
         parts_overproduced: job.parts_overproduced ?? 0,
         delivered: job.delivered ?? 0,
       },
+      shareToken: String(shareToken),
     }
 
     return new Response(JSON.stringify(payload), {

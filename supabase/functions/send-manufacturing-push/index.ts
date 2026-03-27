@@ -34,6 +34,12 @@ interface PushSubscriptionRow {
   subscription: WebPushSubscription
 }
 
+interface SharePushSubscriptionRow {
+  id: string
+  job_id: string
+  subscription: WebPushSubscription
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -104,11 +110,18 @@ Deno.serve(async (req) => {
         body = `Job ${jobName}: +${delta} parts`
     }
 
-    const { data: subscriptions, error: subError } = await supabase
-      .from('push_subscriptions')
-      .select('id, user_id, subscription')
+    const [dashboardResult, shareResult] = await Promise.all([
+      supabase.from('push_subscriptions').select('id, user_id, subscription'),
+      supabase
+        .from('share_push_subscriptions')
+        .select('id, job_id, subscription')
+        .eq('job_id', record.job_id),
+    ])
 
-    if (subError || !subscriptions?.length) {
+    const dashboardSubs = (dashboardResult.error ? [] : dashboardResult.data ?? []) as PushSubscriptionRow[]
+    const shareSubs = (shareResult.error ? [] : shareResult.data ?? []) as SharePushSubscriptionRow[]
+
+    if (!dashboardSubs.length && !shareSubs.length) {
       return new Response(
         JSON.stringify({ ok: true, sent: 0, message: 'No push subscriptions' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -124,12 +137,15 @@ Deno.serve(async (req) => {
 
     const messagePayload = JSON.stringify({ title, body })
     let sent = 0
-    const gone: string[] = []
+    const dashboardGone: string[] = []
+    const shareGone: string[] = []
 
-    for (const row of subscriptions as PushSubscriptionRow[]) {
+    async function sendToSub(
+      row: { id: string; subscription: WebPushSubscription },
+      gone: string[]
+    ) {
       const sub = row.subscription
-      if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) continue
-
+      if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return
       try {
         const subscriber = appServer.subscribe(sub as unknown as globalThis.PushSubscription)
         await subscriber.pushTextMessage(messagePayload, { urgency: 'high' })
@@ -146,12 +162,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (gone.length > 0) {
-      await supabase.from('push_subscriptions').delete().in('id', gone)
+    for (const row of dashboardSubs) {
+      await sendToSub(row, dashboardGone)
+    }
+    for (const row of shareSubs) {
+      await sendToSub(row, shareGone)
+    }
+
+    if (dashboardGone.length > 0) {
+      await supabase.from('push_subscriptions').delete().in('id', dashboardGone)
+    }
+    if (shareGone.length > 0) {
+      await supabase.from('share_push_subscriptions').delete().in('id', shareGone)
     }
 
     return new Response(
-      JSON.stringify({ ok: true, sent, gone: gone.length }),
+      JSON.stringify({
+        ok: true,
+        sent,
+        gone: dashboardGone.length + shareGone.length,
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
