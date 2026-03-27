@@ -282,7 +282,7 @@ function leaveShareSession() {
         <JobShareCard v-if="job" :job="job" @copy-link="handleCopyLink" />
         <AppFooterBar
           v-if="job"
-          :push-mode="authStore.isAuthenticated ? 'auth' : 'share'"
+          :push-mode="shareToken ? 'share' : 'auth'"
           :share-job-id="jobId"
           :share-token="shareToken"
           :show-logout="authStore.isAuthenticated"
