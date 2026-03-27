@@ -2,13 +2,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { toast } from 'vue-sonner'
 
+import AppFooterBar from '../components/AppFooterBar.vue'
 import JobShareCard from '../components/JobShareCard.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
-import { usePwaInstall } from '../composables/usePwaInstall'
-import { useShareWebPush } from '../composables/useShareWebPush'
 import { getJobShareData } from '../lib/shareApi'
+import { useAuthStore } from '../stores/auth'
 import { isValidJobId, verifyJobSharePassword } from '../lib/share'
 import type { JobShareData } from '../types/job'
 
@@ -57,15 +56,7 @@ function setStoredAccess(jobId: string, jobData: JobShareData, shareToken?: stri
 
 const route = useRoute()
 const { t } = useI18n()
-const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
-const {
-  isSupported: sharePushSupported,
-  isSubscribed: sharePushSubscribed,
-  isSubscribing: sharePushSubscribing,
-  error: sharePushError,
-  subscribe: subscribeSharePush,
-  checkSubscription: checkSharePushSubscription,
-} = useShareWebPush()
+const authStore = useAuthStore()
 
 const jobId = computed(() => (route.params.jobId as string) ?? '')
 const password = ref('')
@@ -99,22 +90,64 @@ watch(
   { immediate: true },
 )
 
-async function pollJobData() {
+type PollSource = 'initial' | 'interval' | 'visibility'
+
+async function pollJobData(source: PollSource = 'interval') {
   const jid = jobId.value
   const tok = shareToken.value
-  if (!jid || !tok) return
+  if (!jid || !tok) {
+    console.log('[JobShare poll] skipped (no job id or token)', { source, jid, hasToken: Boolean(tok) })
+    return
+  }
+  console.log('[JobShare poll] request', { source, jobId: jid })
   const result = await getJobShareData(jid, tok)
-  console.log('pollJobData', result)
+  if (result.error) {
+    console.warn('[JobShare poll] API error', { source, error: result.error })
+    return
+  }
   if (result.job) {
-    job.value = result.job
+    const prev = job.value
+    const next = result.job
+    const changed =
+      !prev ||
+      prev.parts_produced !== next.parts_produced ||
+      prev.parts_overproduced !== next.parts_overproduced ||
+      prev.delivered !== next.delivered ||
+      prev.parts_needed !== next.parts_needed
+    console.log('[JobShare poll] job update', {
+      source,
+      changed,
+      previous: prev
+        ? {
+            parts_needed: prev.parts_needed,
+            parts_produced: prev.parts_produced,
+            parts_overproduced: prev.parts_overproduced,
+            delivered: prev.delivered,
+          }
+        : null,
+      next: {
+        parts_needed: next.parts_needed,
+        parts_produced: next.parts_produced,
+        parts_overproduced: next.parts_overproduced,
+        delivered: next.delivered,
+      },
+    })
+    job.value = next
+    setStoredAccess(jid, next, tok)
+  } else {
+    console.warn('[JobShare poll] empty job in response', { source })
   }
 }
 
 function startPolling() {
   if (pollTimer) return
   if (!jobId.value || !shareToken.value) return
-  pollJobData()
-  pollTimer = setInterval(pollJobData, POLL_INTERVAL_MS)
+  console.log('[JobShare] polling started', {
+    jobId: jobId.value,
+    intervalMs: POLL_INTERVAL_MS,
+  })
+  void pollJobData('initial')
+  pollTimer = setInterval(() => void pollJobData('interval'), POLL_INTERVAL_MS)
 }
 
 function stopPolling() {
@@ -124,24 +157,30 @@ function stopPolling() {
   }
 }
 
-watch([unlocked, shareToken], ([u, tok]) => {
-  if (u && tok) {
-    startPolling()
-  } else {
-    stopPolling()
+watch(
+  [unlocked, shareToken],
+  ([u, tok]) => {
+    if (u && tok) {
+      startPolling()
+    } else {
+      stopPolling()
+    }
+  },
+  { immediate: true },
+)
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && unlocked.value && shareToken.value) {
+    void pollJobData('visibility')
   }
-})
+}
 
 onMounted(() => {
-  if (unlocked.value && shareToken.value) {
-    startPolling()
-  }
-  if (sharePushSupported) {
-    checkSharePushSubscription()
-  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   stopPolling()
 })
 
@@ -175,17 +214,6 @@ async function handlePasswordSubmit() {
   }
 }
 
-async function handleEnableSharePush() {
-  const tok = shareToken.value
-  if (!jobId.value || !tok) return
-  const ok = await subscribeSharePush(jobId.value, tok)
-  if (!ok && sharePushError.value) {
-    toast.error(sharePushError.value)
-  } else if (ok) {
-    toast.success(t('webPush.enabled'))
-  }
-}
-
 function handleCopyLink() {
   const url = `${window.location.origin}${window.location.pathname}`
   navigator.clipboard
@@ -195,6 +223,17 @@ function handleCopyLink() {
     })
     .catch(() => {})
 }
+
+function leaveShareSession() {
+  sessionStorage.removeItem(SHARE_ACCESS_KEY)
+  unlocked.value = false
+  job.value = null
+  shareToken.value = null
+  password.value = ''
+  error.value = null
+  stopPolling()
+  console.log('[JobShare] left share session', { jobId: jobId.value })
+}
 </script>
 
 <template>
@@ -202,11 +241,11 @@ function handleCopyLink() {
     <header class="share-header">
       <div class="share-header-content">
         <h1 class="share-title">{{ t('share.title') }}</h1>
-        <LanguageSwitcher />
+        <LanguageSwitcher v-if="!unlocked" />
       </div>
     </header>
 
-    <main class="share-content">
+    <main class="share-content" :class="{ 'share-content--with-footer': unlocked && job }">
       <template v-if="!jobId">
         <p class="share-error">{{ t('share.invalidLink') }}</p>
       </template>
@@ -241,29 +280,15 @@ function handleCopyLink() {
 
       <template v-else>
         <JobShareCard v-if="job" :job="job" @copy-link="handleCopyLink" />
-        <footer v-if="job" class="share-footer">
-          <div class="share-footer-actions">
-            <button
-              v-if="canInstall && !isInstalled"
-              class="btn btn-compact btn-secondary"
-              type="button"
-              :disabled="isInstalling"
-              @click="install"
-            >
-              {{ isInstalling ? t('pwa.installing') : t('pwa.install') }}
-            </button>
-            <button
-              v-if="sharePushSupported && !sharePushSubscribed && shareToken"
-              class="btn btn-compact btn-secondary"
-              type="button"
-              :disabled="sharePushSubscribing"
-              :title="sharePushError ?? undefined"
-              @click="handleEnableSharePush"
-            >
-              {{ sharePushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
-            </button>
-          </div>
-        </footer>
+        <AppFooterBar
+          v-if="job"
+          :push-mode="authStore.isAuthenticated ? 'auth' : 'share'"
+          :share-job-id="jobId"
+          :share-token="shareToken"
+          :show-logout="authStore.isAuthenticated"
+          show-leave-share
+          @leave-share="leaveShareSession"
+        />
       </template>
     </main>
   </div>
@@ -305,6 +330,10 @@ function handleCopyLink() {
   max-width: 600px;
   margin: 0 auto;
   width: 100%;
+}
+
+.share-content--with-footer {
+  padding-bottom: 64px;
 }
 
 .share-gate {
@@ -369,20 +398,4 @@ function handleCopyLink() {
   overflow: hidden;
 }
 
-.share-footer {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.share-footer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.btn-compact {
-  font-size: 14px;
-  padding: 8px 14px;
-}
 </style>

@@ -1,37 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, watch } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, provide, ref } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
-import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import AppFooterBar from './components/AppFooterBar.vue'
 import Toast from './components/Toast.vue'
-import { Toaster, toast } from 'vue-sonner'
+import { Toaster } from 'vue-sonner'
 import { useManufacturingNotifications } from './composables/useManufacturingNotifications'
-import { usePwaInstall } from './composables/usePwaInstall'
-import { useWebPush } from './composables/useWebPush'
 import { useAuthStore } from './stores/auth'
 import { useJobsStore } from './stores/jobs'
 
 const authStore = useAuthStore()
-const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
-const {
-  isSupported: webPushSupported,
-  isSubscribed: webPushSubscribed,
-  isSubscribing: webPushSubscribing,
-  error: webPushError,
-  subscribe: subscribeWebPush,
-  checkSubscription: checkWebPushSubscription,
-} = useWebPush()
 
 useManufacturingNotifications()
 const jobsStore = useJobsStore()
 const route = useRoute()
-const router = useRouter()
 const { t } = useI18n()
 
 const { searchTerm, statusFilter, showArchived } = storeToRefs(jobsStore)
-const appVersion = __APP_VERSION__
 
 const showHeader = computed(
   () => authStore.isAuthenticated && route.name !== 'login' && route.name !== 'jobShare',
@@ -59,33 +46,7 @@ function handleAddJob() {
 onMounted(async () => {
   if (!authStore.loading) return
   await authStore.init()
-  if (authStore.isAuthenticated && webPushSupported) {
-    checkWebPushSubscription()
-  }
 })
-
-watch(
-  () => authStore.isAuthenticated,
-  (isAuth) => {
-    if (isAuth && webPushSupported) {
-      checkWebPushSubscription()
-    }
-  },
-)
-
-async function handleEnablePush() {
-  const ok = await subscribeWebPush()
-  if (!ok && webPushError.value) {
-    toast.error(webPushError.value)
-  } else if (ok) {
-    toast.success(t('webPush.enabled'))
-  }
-}
-
-async function handleLogout() {
-  await authStore.signOut()
-  router.push({ name: 'login' })
-}
 </script>
 
 <template>
@@ -126,41 +87,7 @@ async function handleLogout() {
 
     <Toast />
     <Toaster richColors position="top-center" />
-    <footer v-if="showFooter" class="app-footer">
-      <div class="footer-content">
-        <span
-          class="app-version"
-          :title="`${t('common.version')} ${appVersion}`"
-        >
-          v{{ appVersion }}
-        </span>
-        <div class="footer-actions">
-          <LanguageSwitcher />
-          <button
-            v-if="canInstall && !isInstalled"
-            class="btn btn-compact btn-secondary"
-            type="button"
-            :disabled="isInstalling"
-            @click="install"
-          >
-            {{ isInstalling ? t('pwa.installing') : t('pwa.install') }}
-          </button>
-          <button
-            v-if="webPushSupported && !webPushSubscribed"
-            class="btn btn-compact btn-secondary"
-            type="button"
-            :disabled="webPushSubscribing"
-            :title="webPushError ?? undefined"
-            @click="handleEnablePush"
-          >
-            {{ webPushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
-          </button>
-          <button class="btn btn-compact btn-secondary" type="button" @click="handleLogout">
-            {{ t('auth.logout') }}
-          </button>
-        </div>
-      </div>
-    </footer>
+    <AppFooterBar v-if="showFooter" />
   </div>
 </template>
 
@@ -225,41 +152,6 @@ async function handleLogout() {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.app-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 48px;
-  padding: 8px 16px;
-  background: #fff;
-  border-top: 1px solid #e5e7eb;
-  z-index: 100;
-  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.footer-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 100%;
-}
-
-.app-version {
-  font-size: 12px;
-  color: #6b7280;
-  flex-shrink: 0;
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 @media (max-width: 768px) {
   .header-content {
     gap: 8px;
@@ -280,18 +172,6 @@ async function handleLogout() {
     font-size: 12px;
     padding: 6px 10px;
     white-space: nowrap;
-  }
-
-  .footer-content {
-    gap: 8px;
-  }
-
-  .footer-actions {
-    gap: 8px;
-  }
-
-  .language-switcher {
-    min-width: 100px;
   }
 }
 

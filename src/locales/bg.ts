@@ -155,6 +155,7 @@ export default {
     invalidPassword: 'Невалидна парола. Опитайте отново.',
     invalidLink: 'Невалиден линк.',
     submit: 'Преглед',
+    leaveSession: 'Напусни споделеното задание',
   },
 }
 

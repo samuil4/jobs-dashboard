@@ -155,6 +155,7 @@ export default {
     invalidPassword: 'Невірний пароль. Спробуйте ще раз.',
     invalidLink: 'Недійсне посилання.',
     submit: 'Переглянути',
+    leaveSession: 'Вийти з перегляду завдання',
   },
 }
 
