@@ -1,18 +1,8 @@
 import { computed, ref } from 'vue'
 
 import { supabase } from '../lib/supabase'
+import { urlBase64ToUint8Array } from '../lib/webPushUtils'
 import { useAuthStore } from '../stores/auth'
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = window.atob(base64)
-  const outputArray = new Uint8Array(rawData.length)
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i)
-  }
-  return outputArray
-}
 
 export function useClientWebPush() {
   const authStore = useAuthStore()
@@ -38,16 +28,39 @@ export function useClientWebPush() {
   async function persistSubscription(subscription: PushSubscription): Promise<void> {
     const userId = authStore.userId
     const clientId = authStore.clientId
+    const updatedAt = new Date().toISOString()
 
     if (!userId || !clientId) {
       throw new Error('Client session is required')
+    }
+
+    const { data: existingRow, error: lookupError } = await supabase
+      .from('client_push_subscriptions')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (lookupError) throw lookupError
+
+    if (existingRow?.id) {
+      const { error: updateError } = await supabase
+        .from('client_push_subscriptions')
+        .update({
+          subscription: subscription.toJSON(),
+          updated_at: updatedAt,
+        })
+        .eq('id', existingRow.id)
+
+      if (updateError) throw updateError
+      return
     }
 
     const { error: insertError } = await supabase.from('client_push_subscriptions').insert({
       client_id: clientId,
       user_id: userId,
       subscription: subscription.toJSON(),
-      updated_at: new Date().toISOString(),
+      updated_at: updatedAt,
     })
 
     if (insertError) throw insertError

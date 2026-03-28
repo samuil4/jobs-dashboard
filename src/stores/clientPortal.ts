@@ -87,8 +87,13 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   }
 
   function subscribe(clientId: string) {
-    activeClientId.value = clientId
-    if (channel) return
+    if (channel && activeClientId.value === clientId) return
+
+    if (channel) {
+      void channel.unsubscribe()
+      supabase.removeChannel(channel)
+      channel = null
+    }
 
     channel = supabase
       .channel(`client-job-updates:${clientId}`)
@@ -104,6 +109,8 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
         }
       )
       .subscribe()
+
+    activeClientId.value = clientId
   }
 
   function unsubscribe() {

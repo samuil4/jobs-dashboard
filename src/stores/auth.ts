@@ -52,8 +52,11 @@ export const useAuthStore = defineStore('auth', () => {
     } = await supabase.auth.getSession()
     session.value = initialSession ?? null
     user.value = initialSession?.user ?? null
-    await resolveAccessProfile(initialSession?.user?.id ?? null)
-    loading.value = false
+    try {
+      await resolveAccessProfile(initialSession?.user?.id ?? null)
+    } finally {
+      loading.value = false
+    }
 
     supabase.auth.onAuthStateChange(async (_event, newSession) => {
       try {
