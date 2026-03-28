@@ -51,7 +51,12 @@ export function useShareWebPush() {
     error.value = null
 
     try {
-      const registration = await navigator.serviceWorker.ready
+      const registration = await navigator.serviceWorker.getRegistration()
+      if (!registration) {
+        error.value = 'Service worker is not registered'
+        isSubscribing.value = false
+        return false
+      }
       let pushSubscription = await registration.pushManager.getSubscription()
 
       if (!pushSubscription) {
@@ -106,7 +111,12 @@ export function useShareWebPush() {
   async function checkSubscription() {
     if (!isSupported.value) return
     try {
-      const registration = await navigator.serviceWorker.ready
+      const registration = await navigator.serviceWorker.getRegistration()
+      if (!registration) {
+        isSubscribed.value = false
+        updatePermission()
+        return
+      }
       const subscription = await registration.pushManager.getSubscription()
       isSubscribed.value = !!subscription
     } catch {
