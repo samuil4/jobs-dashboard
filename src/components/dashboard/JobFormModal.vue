@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 import { ASSIGNEE_OPTIONS, DEFAULT_ASSIGNEE } from '../../stores/jobs'
+import { useClientsStore } from '../../stores/clients'
 import type { Assignee } from '../../types/job'
 
 const props = defineProps<{
@@ -12,6 +14,7 @@ const props = defineProps<{
     name: string
     partsNeeded: number
     assignee: Assignee
+    clientId?: string | null
     sharePassword?: string | null
     hasSharePassword?: boolean
   }
@@ -19,15 +22,27 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', payload: { name: string; partsNeeded: number; assignee: Assignee; sharePassword?: string | null }): void
+  (
+    e: 'submit',
+    payload: {
+      name: string
+      partsNeeded: number
+      assignee: Assignee
+      clientId?: string | null
+      sharePassword?: string | null
+    }
+  ): void
 }>()
 
 const { t } = useI18n()
+const clientsStore = useClientsStore()
+const { clientOptions } = storeToRefs(clientsStore)
 
 const form = reactive({
   name: '',
   partsNeeded: 0,
   assignee: DEFAULT_ASSIGNEE,
+  clientId: '',
   sharePassword: '',
   touched: false,
 })
@@ -39,12 +54,14 @@ watch(
       form.name = ''
       form.partsNeeded = 0
       form.assignee = DEFAULT_ASSIGNEE
+      form.clientId = ''
       form.sharePassword = ''
       return
     }
     form.name = values.name
     form.partsNeeded = values.partsNeeded
     form.assignee = values.assignee
+    form.clientId = values.clientId ?? ''
     form.sharePassword = values.sharePassword ?? ''
   },
   { immediate: true }
@@ -86,6 +103,7 @@ function handleSubmit() {
     name: form.name.trim(),
     partsNeeded: Number(form.partsNeeded),
     assignee: form.assignee,
+    clientId: form.clientId || null,
     sharePassword: form.sharePassword.trim() || null,
   })
 }
@@ -140,6 +158,16 @@ function handleSubmit() {
           >
             <option v-for="assignee in ASSIGNEE_OPTIONS" :key="assignee" :value="assignee">
               {{ t(`jobs.assignees.${assignee.toLowerCase()}`) }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="job-client">{{ t('jobs.client') }}</label>
+          <select id="job-client" v-model="form.clientId">
+            <option value="">{{ t('jobs.clientUnassigned') }}</option>
+            <option v-for="client in clientOptions" :key="client.id" :value="client.id">
+              {{ client.label }} ({{ client.username }})
             </option>
           </select>
         </div>

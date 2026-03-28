@@ -8,10 +8,12 @@ import HistoryEditModal from '../components/dashboard/HistoryEditModal.vue'
 import JobCard from '../components/dashboard/JobCard.vue'
 import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
+import { useClientsStore } from '../stores/clients'
 import { useJobsStore } from '../stores/jobs'
 import type { Assignee, UpdateType } from '../types/job'
 
 const jobsStore = useJobsStore()
+const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
 
@@ -54,12 +56,13 @@ const modalInitialValues = computed(() => {
     name: job.name,
     partsNeeded: job.parts_needed,
     assignee: job.assignee as Assignee,
+    clientId: job.client_id,
     hasSharePassword: Boolean(job.has_share_password),
   }
 })
 
 onMounted(async () => {
-  await jobsStore.fetchJobs()
+  await Promise.all([jobsStore.fetchJobs(), clientsStore.fetchClients()])
 })
 
 function openCreateModal() {
@@ -84,6 +87,7 @@ async function handleModalSubmit(payload: {
   name: string
   partsNeeded: number
   assignee: Assignee
+  clientId?: string | null
   sharePassword?: string | null
 }) {
   try {
@@ -94,11 +98,13 @@ async function handleModalSubmit(payload: {
         name: string
         partsNeeded: number
         assignee: Assignee
+        clientId?: string | null
         sharePassword?: string | null
       } = {
         name: payload.name,
         partsNeeded: payload.partsNeeded,
         assignee: payload.assignee,
+        clientId: payload.clientId ?? null,
       }
       if (payload.sharePassword != null && payload.sharePassword.trim() !== '') {
         updatePayload.sharePassword = payload.sharePassword

@@ -16,6 +16,12 @@ export interface JobRecord {
   assignee: Assignee
   created_at: string
   updated_at: string
+  client_id: string | null
+  client?: {
+    id: string
+    username: string
+    company_name: string
+  } | null
   has_share_password?: boolean
 }
 
@@ -39,6 +45,7 @@ export interface NewJobPayload {
   name: string
   partsNeeded: number
   assignee: Assignee
+  clientId?: string | null
   sharePassword?: string | null
 }
 
@@ -46,6 +53,7 @@ export interface UpdateJobPayload {
   name: string
   partsNeeded: number
   assignee: Assignee
+  clientId?: string | null
   sharePassword?: string | null
 }
 

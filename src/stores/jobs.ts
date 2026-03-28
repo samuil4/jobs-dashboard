@@ -17,9 +17,16 @@ export const ASSIGNEE_OPTIONS: Assignee[] = ['Samuil', 'Oleksii', 'Veselin']
 export const DEFAULT_ASSIGNEE: Assignee = ASSIGNEE_OPTIONS[0]!
 
 const JOB_SELECT_FIELDS =
-  'id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, has_share_password, job_updates (*)'
+  'id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, client_id, has_share_password, client:clients(id, username, company_name), job_updates (*)'
 
 type StatusFilter = 'all' | 'active' | 'completed' | 'archived'
+type SelectedJobResponse = Omit<JobRecord, 'client'> & {
+  client?: JobRecord['client'] | NonNullable<JobRecord['client']>[]
+  job_updates: JobUpdateRecord[] | null
+}
+type NormalizedSelectedJobRow = JobRecord & {
+  job_updates: JobUpdateRecord[] | null
+}
 
 export const useJobsStore = defineStore('jobs', () => {
   const jobs = ref<JobWithHistory[]>([])
@@ -35,6 +42,14 @@ export const useJobsStore = defineStore('jobs', () => {
       job_updates: history?.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       ) ?? [],
+    }
+  }
+
+  function parseSelectedJobRow(row: unknown): NormalizedSelectedJobRow {
+    const selected = row as SelectedJobResponse
+    return {
+      ...selected,
+      client: Array.isArray(selected.client) ? selected.client[0] ?? null : selected.client ?? null,
     }
   }
 
@@ -54,7 +69,7 @@ export const useJobsStore = defineStore('jobs', () => {
 
     jobs.value =
       data?.map((item) => {
-        const { job_updates, ...rest } = item as JobRecord & { job_updates: JobUpdateRecord[] | null }
+        const { job_updates, ...rest } = parseSelectedJobRow(item)
         return withHistory(rest, job_updates)
       }) ?? []
 
@@ -80,6 +95,7 @@ export const useJobsStore = defineStore('jobs', () => {
       archived: false,
       status: 'active',
       assignee: payload.assignee,
+      client_id: payload.clientId ?? null,
       created_at: now,
       updated_at: now,
     }
@@ -97,7 +113,7 @@ export const useJobsStore = defineStore('jobs', () => {
       throw insertError
     }
 
-    const { job_updates, ...rest } = data as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    const { job_updates, ...rest } = parseSelectedJobRow(data)
     jobs.value = [withHistory(rest, job_updates), ...jobs.value]
   }
 
@@ -140,6 +156,7 @@ export const useJobsStore = defineStore('jobs', () => {
       parts_produced: newPartsProduced,
       parts_overproduced: newPartsOverproduced,
       assignee: payload.assignee,
+      client_id: payload.clientId ?? null,
       status: job.archived ? 'archived' : newStatus,
       updated_at: formatISO(new Date()),
     }
@@ -158,7 +175,7 @@ export const useJobsStore = defineStore('jobs', () => {
       throw updateError
     }
 
-    const { job_updates, ...rest } = data as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    const { job_updates, ...rest } = parseSelectedJobRow(data)
     jobs.value = jobs.value.map((item) => (item.id === id ? withHistory(rest, job_updates) : item))
   }
 
@@ -189,7 +206,7 @@ export const useJobsStore = defineStore('jobs', () => {
       throw updateError
     }
 
-    const { job_updates, ...rest } = data as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    const { job_updates, ...rest } = parseSelectedJobRow(data)
     jobs.value = jobs.value.map((item) => (item.id === id ? withHistory(rest, job_updates) : item))
   }
 
@@ -292,7 +309,9 @@ export const useJobsStore = defineStore('jobs', () => {
       if (!query) return true
       return (
         job.name.toLowerCase().includes(query) ||
-        job.assignee.toLowerCase().includes(query)
+        job.assignee.toLowerCase().includes(query) ||
+        job.client?.company_name?.toLowerCase().includes(query) ||
+        job.client?.username?.toLowerCase().includes(query)
       )
     })
   })
@@ -467,7 +486,7 @@ export const useJobsStore = defineStore('jobs', () => {
         throw updateError
       }
 
-      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      const { job_updates, ...rest } = parseSelectedJobRow(updatedJob)
       jobs.value = jobs.value.map((item) =>
         item.id === jobId ? withHistory(rest, job_updates) : item
       )
@@ -485,7 +504,7 @@ export const useJobsStore = defineStore('jobs', () => {
         throw updateError
       }
 
-      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      const { job_updates, ...rest } = parseSelectedJobRow(updatedJob)
       jobs.value = jobs.value.map((item) =>
         item.id === jobId ? withHistory(rest, job_updates) : item
       )
@@ -512,7 +531,7 @@ export const useJobsStore = defineStore('jobs', () => {
         throw updateError
       }
 
-      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      const { job_updates, ...rest } = parseSelectedJobRow(updatedJob)
       jobs.value = jobs.value.map((item) =>
         item.id === jobId ? withHistory(rest, job_updates) : item
       )
@@ -590,7 +609,7 @@ export const useJobsStore = defineStore('jobs', () => {
         throw jobUpdateError
       }
 
-      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      const { job_updates, ...rest } = parseSelectedJobRow(updatedJob)
       jobs.value = jobs.value.map((item) =>
         item.id === jobId ? withHistory(rest, job_updates) : item
       )
@@ -608,7 +627,7 @@ export const useJobsStore = defineStore('jobs', () => {
         throw jobUpdateError
       }
 
-      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      const { job_updates, ...rest } = parseSelectedJobRow(updatedJob)
       jobs.value = jobs.value.map((item) =>
         item.id === jobId ? withHistory(rest, job_updates) : item
       )
@@ -635,7 +654,7 @@ export const useJobsStore = defineStore('jobs', () => {
         throw jobUpdateError
       }
 
-      const { job_updates, ...rest } = updatedJob as JobRecord & { job_updates: JobUpdateRecord[] | null }
+      const { job_updates, ...rest } = parseSelectedJobRow(updatedJob)
       jobs.value = jobs.value.map((item) =>
         item.id === jobId ? withHistory(rest, job_updates) : item
       )
@@ -667,7 +686,7 @@ export const useJobsStore = defineStore('jobs', () => {
       throw updateError
     }
 
-    const { job_updates, ...rest } = data as JobRecord & { job_updates: JobUpdateRecord[] | null }
+    const { job_updates, ...rest } = parseSelectedJobRow(data)
     jobs.value = jobs.value.map((item) =>
       item.id === id ? withHistory(rest, job_updates) : item
     )

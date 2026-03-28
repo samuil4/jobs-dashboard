@@ -218,6 +218,9 @@ onUnmounted(() => {
         <p class="assignee">
           {{ t('jobs.assignee') }}: {{ job.assignee }}
         </p>
+        <p v-if="job.client" class="assignee">
+          {{ t('jobs.client') }}: {{ job.client.company_name }}
+        </p>
       </div>
       <div ref="menuAnchorRef" class="status status-with-menu">
         <span :class="statusBadgeClass">

@@ -5,14 +5,18 @@ Manufacturing jobs dashboard built with Vue 3 + Vite. Tracks production targets,
 ## Features
 
 - Create, edit and archive jobs with name, target quantity, produced quantity and assignee (`Samuil`, `Oleksii`, `Veselin`).
+- Assign each job to a client, or leave it unassigned.
+- Manage clients from a dedicated staff page with add, edit, delete, and calculated workload totals.
+- Client portal with separate login, client-only routing, and client-only job visibility.
+- Header actions grouped into a dropdown menu, including navigation to the clients page.
 - Incremental production updates with confirmation when exceeding the remaining quantity.
 - Automatic completion state when produced equals required.
 - History timeline for every job update.
 - Filter/search by status, archived state or keyword.
 - Real-time in-app notifications when parts are produced, delivered, or failed (Supabase Realtime).
-- Optional push notifications when the app is minimized or closed (Web Push via Edge Function).
+- Optional push notifications when the app is minimized or closed (Web Push via Edge Function), including client-scoped notifications in the client portal.
 - Client share links: password-protected read-only job view at `/share/:jobId` for non-registered users (parts needed, parts produced, parts ready for delivery). Access TTL 72 hours.
-- Simple username/password login (Supabase auth), plus logout.
+- Simple username/password login (Supabase auth) for staff, plus a separate client login flow and logout.
 - CSV seeding script to bootstrap data from `reference/uchet_izdeliy.csv`.
 - i18n-ready UI with runtime language switcher (English default).
 
@@ -197,7 +201,25 @@ supabase functions deploy verify-job-share-password --no-verify-jwt
 
 The function requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (set as secrets or provided by Supabase). It is invoked with `--no-verify-jwt` so anonymous users can call it from the share view.
 
-3. Create at least one Supabase auth user. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` → Supabase email `operator@example.com`.
+2.6. Add clients, client/job access control, and client-scoped push subscriptions by running `supabase/migrations/0007_clients_and_client_access.sql`.
+
+This migration adds:
+
+- `public.clients` linked to `auth.users`
+- `jobs.client_id`
+- role-aware helper functions and RLS policies
+- client-only access to assigned jobs and job history
+- `client_push_subscriptions` for client portal notifications
+
+3. Create at least one Supabase auth user for staff. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` becomes Supabase email `operator@example.com`.
+
+4. Deploy the staff-only Edge Function used by the clients page to create, update, and delete client auth users:
+
+```bash
+supabase functions deploy manage-client-users
+```
+
+The function requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. It uses the caller's JWT to verify that only staff users can manage client accounts.
 
 ### Manufacturing Notifications (Optional)
 
@@ -215,6 +237,8 @@ The app shows real-time in-app toasts when parts are produced, delivered, or fai
 4. Deploy the Edge Function: `supabase functions deploy send-manufacturing-push --no-verify-jwt`
 5. Create a Database Webhook in Supabase Dashboard: **Database Webhooks** → Create webhook on `public.job_updates` INSERT → Target Edge Function `send-manufacturing-push`.
 
+This staff notification flow now excludes client users. Client users subscribe through the client portal and receive notifications only for jobs assigned to their own client account.
+
 **Share view (real-time updates, web push, PWA install):**
 
 1. Run migration `supabase/migrations/0006_share_tokens_and_push.sql`.
@@ -222,6 +246,19 @@ The app shows real-time in-app toasts when parts are produced, delivered, or fai
    - `supabase functions deploy get-job-share-data --no-verify-jwt`
    - `supabase functions deploy register-share-push --no-verify-jwt`
 3. `verify-job-share-password` must be redeployed (returns share token). `send-manufacturing-push` must be redeployed (sends to share recipients).
+
+### Clients And Client Portal
+
+After applying migration `0007_clients_and_client_access.sql` and deploying `manage-client-users`, the app supports:
+
+- a staff-only `Clients` page for creating and managing clients
+- assigning one client per job from the job form
+- a separate client login at `/client/login`
+- a client jobs page at `/client/jobs`
+- route protection so clients cannot navigate to staff pages
+- client-scoped search and archived-job toggling in the client portal
+
+Client credentials are stored in Supabase Auth. Client usernames are converted internally to emails using the fixed domain `clients.jobs-dashboard.local`, so client accounts should be created through the app's clients page rather than manually in the Auth dashboard.
 
 ## Environment Variables
 
@@ -249,6 +286,27 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 npm install
 npm run dev
 ```
+
+## What Still Needs To Be Done
+
+If the code is already pulled locally, the remaining setup to make the new client functionality work in a real environment is:
+
+1. Apply `supabase/migrations/0007_clients_and_client_access.sql`.
+2. Deploy `manage-client-users`.
+3. Redeploy `send-manufacturing-push` so it includes client portal subscriptions.
+4. Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the deployed Edge Functions.
+5. Create at least one staff account in Supabase Auth.
+6. Sign in as staff and create client accounts from the new clients page instead of creating them manually in the Supabase Auth dashboard.
+
+Recommended manual verification after setup:
+
+1. Staff can open the dashboard and clients pages.
+2. Staff can create, edit, and delete clients.
+3. Staff can assign a client to a job.
+4. Client can sign in at `/client/login`.
+5. Client can only access `/client/jobs` and is redirected away from staff routes.
+6. Client only sees jobs assigned to that client.
+7. Archived client jobs stay hidden until explicitly requested.
 
 ### Build for Production
 
