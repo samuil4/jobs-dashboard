@@ -189,25 +189,32 @@ export const useJobsStore = defineStore('jobs', () => {
       : job.parts_produced >= job.parts_needed
         ? ('completed' as const)
         : ('active' as const)
+    const updatedAt = formatISO(new Date())
 
-    const { data, error: updateError } = await supabase
+    const { error: updateError } = await supabase
       .from('jobs')
       .update({
         archived: archivedValue,
         status,
-        updated_at: formatISO(new Date()),
+        updated_at: updatedAt,
       })
       .eq('id', id)
-      .select(JOB_SELECT_FIELDS)
-      .single()
 
     if (updateError) {
       error.value = updateError.message
       throw updateError
     }
 
-    const { job_updates, ...rest } = parseSelectedJobRow(data)
-    jobs.value = jobs.value.map((item) => (item.id === id ? withHistory(rest, job_updates) : item))
+    jobs.value = jobs.value.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            archived: archivedValue,
+            status,
+            updated_at: updatedAt,
+          }
+        : item
+    )
   }
 
   async function deleteJob(id: string) {

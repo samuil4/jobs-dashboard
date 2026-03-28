@@ -72,6 +72,10 @@ async function handleSubmit() {
           <span v-if="submitting">{{ t('auth.signingIn') }}</span>
           <span v-else>{{ t('auth.signIn') }}</span>
         </button>
+
+        <RouterLink class="btn btn-secondary login-switch-link" to="/client/login">
+          {{ t('auth.clientLogin') }}
+        </RouterLink>
       </form>
 
       <div class="login-footer">
@@ -115,6 +119,11 @@ async function handleSubmit() {
 .login-form {
   display: flex;
   flex-direction: column;
+}
+
+.login-switch-link {
+  margin-top: 12px;
+  text-decoration: none;
 }
 
 .error {

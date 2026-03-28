@@ -18,6 +18,7 @@ export default {
     username: "Ім'я користувача",
     password: 'Пароль',
     signIn: 'Увійти',
+    clientLogin: 'Вхід для клієнтів',
     signingIn: 'Вхід…',
     error: 'Невірні дані. Спробуйте ще раз.',
     logout: 'Вийти',

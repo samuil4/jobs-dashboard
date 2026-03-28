@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import { supabase } from '../lib/supabase'
 import type { ClientJobRecord } from '../types/client'
+import type { JobUpdateRecord, UpdateType } from '../types/job'
 
 const CLIENT_JOB_FIELDS =
   'id, name, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, updated_at'
@@ -13,10 +14,13 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const showArchived = ref(false)
+  const activeClientId = ref<string | null>(null)
+  let channel: ReturnType<typeof supabase.channel> | null = null
 
   async function fetchJobs(clientId: string, includeArchived = showArchived.value) {
     loading.value = true
     error.value = null
+    activeClientId.value = clientId
 
     let query = supabase
       .from('jobs')
@@ -41,6 +45,75 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     loading.value = false
   }
 
+  function mergeJobUpdate(update: JobUpdateRecord) {
+    let matched = false
+
+    jobs.value = jobs.value.map((job) => {
+      if (job.id !== update.job_id) return job
+      matched = true
+
+      const updateType = (update.update_type ?? 'production') as UpdateType
+      let partsProduced = job.parts_produced
+      let partsOverproduced = job.parts_overproduced ?? 0
+      let delivered = job.delivered ?? 0
+
+      if (updateType === 'production') {
+        const currentTotal = partsProduced + partsOverproduced
+        const newTotal = currentTotal + update.delta
+        partsProduced = Math.min(newTotal, job.parts_needed)
+        partsOverproduced = Math.max(0, newTotal - job.parts_needed)
+      } else if (updateType === 'delivery') {
+        delivered += update.delta
+      }
+
+      return {
+        ...job,
+        parts_produced: partsProduced,
+        parts_overproduced: partsOverproduced,
+        delivered,
+        status:
+          job.archived
+            ? 'archived'
+            : partsProduced >= job.parts_needed
+              ? 'completed'
+              : 'active',
+        updated_at: update.created_at,
+      }
+    })
+
+    if (!matched && activeClientId.value) {
+      void fetchJobs(activeClientId.value, showArchived.value)
+    }
+  }
+
+  function subscribe(clientId: string) {
+    activeClientId.value = clientId
+    if (channel) return
+
+    channel = supabase
+      .channel(`client-job-updates:${clientId}`)
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          table: 'job_updates',
+          event: 'INSERT',
+        },
+        (payload) => {
+          mergeJobUpdate(payload.new as JobUpdateRecord)
+        }
+      )
+      .subscribe()
+  }
+
+  function unsubscribe() {
+    if (channel) {
+      supabase.removeChannel(channel)
+      channel = null
+    }
+    activeClientId.value = null
+  }
+
   async function toggleArchived(clientId: string) {
     await fetchJobs(clientId, !showArchived.value)
   }
@@ -60,5 +133,7 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     filteredJobs,
     fetchJobs,
     toggleArchived,
+    subscribe,
+    unsubscribe,
   }
 })

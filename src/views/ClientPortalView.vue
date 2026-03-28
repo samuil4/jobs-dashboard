@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
@@ -32,18 +32,36 @@ function productionProgress(job: {
   return Math.min(100, Math.round((job.parts_produced / job.parts_needed) * 100))
 }
 
+function totalProduced(job: {
+  parts_produced: number
+  parts_overproduced: number
+}) {
+  return job.parts_produced + (job.parts_overproduced ?? 0)
+}
+
 onMounted(async () => {
   await loadJobs(false)
+  if (authStore.clientId) {
+    portalStore.subscribe(authStore.clientId)
+  }
 })
 
 watch(
   () => authStore.clientId,
-  async (clientId) => {
+  async (clientId, previousClientId) => {
+    if (previousClientId && previousClientId !== clientId) {
+      portalStore.unsubscribe()
+    }
     if (clientId) {
       await portalStore.fetchJobs(clientId, showArchived.value)
+      portalStore.subscribe(clientId)
     }
   }
 )
+
+onUnmounted(() => {
+  portalStore.unsubscribe()
+})
 </script>
 
 <template>
@@ -105,7 +123,7 @@ watch(
                 </span>
               </td>
               <td>{{ job.parts_needed }}</td>
-              <td>{{ job.parts_produced }}</td>
+              <td>{{ totalProduced(job) }}</td>
               <td>{{ job.delivered }}</td>
               <td class="progress-cell">
                 <div class="progress-copy">
@@ -117,7 +135,7 @@ watch(
               </td>
               <td class="stage-cell">
                 <div>{{ t('clients.partsRequested') }}: {{ job.parts_needed }}</div>
-                <div>{{ t('clients.partsProduced') }}: {{ job.parts_produced }}</div>
+                <div>{{ t('clients.partsProduced') }}: {{ totalProduced(job) }}</div>
                 <div>{{ t('clients.partsDelivered') }}: {{ job.delivered }}</div>
               </td>
             </tr>

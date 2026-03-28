@@ -18,6 +18,7 @@ export default {
     username: 'Username',
     password: 'Password',
     signIn: 'Sign in',
+    clientLogin: 'Client login',
     signingIn: 'Signing in…',
     error: 'Invalid credentials. Please try again.',
     logout: 'Log out',

@@ -18,6 +18,7 @@ export default {
     username: 'Потребителско име',
     password: 'Парола',
     signIn: 'Вход',
+    clientLogin: 'Клиентски вход',
     signingIn: 'Влизане…',
     error: 'Невалидни данни за вход. Опитайте отново.',
     logout: 'Изход',
