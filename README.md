@@ -215,6 +215,14 @@ The app shows real-time in-app toasts when parts are produced, delivered, or fai
 4. Deploy the Edge Function: `supabase functions deploy send-manufacturing-push --no-verify-jwt`
 5. Create a Database Webhook in Supabase Dashboard: **Database Webhooks** → Create webhook on `public.job_updates` INSERT → Target Edge Function `send-manufacturing-push`.
 
+**Share view (real-time updates, web push, PWA install):**
+
+1. Run migration `supabase/migrations/0006_share_tokens_and_push.sql`.
+2. Deploy Edge Functions (share flow uses anon key, no JWT):
+   - `supabase functions deploy get-job-share-data --no-verify-jwt`
+   - `supabase functions deploy register-share-push --no-verify-jwt`
+3. `verify-job-share-password` must be redeployed (returns share token). `send-manufacturing-push` must be redeployed (sends to share recipients).
+
 ## Environment Variables
 
 Create a `.env.local` file in the project root:

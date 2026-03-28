@@ -28,6 +28,7 @@ export default {
     enable: 'Включи известия',
     enabling: 'Включване…',
     enabled: 'Известията са включени',
+    failed: 'Неуспешно включване на известия. Опитайте отново.',
   },
   navigation: {
     dashboard: 'Табло',
@@ -155,6 +156,7 @@ export default {
     invalidPassword: 'Невалидна парола. Опитайте отново.',
     invalidLink: 'Невалиден линк.',
     submit: 'Преглед',
+    leaveSession: 'Напусни споделеното задание',
   },
 }
 

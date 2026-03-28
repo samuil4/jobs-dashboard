@@ -28,6 +28,7 @@ export default {
     enable: 'Enable notifications',
     enabling: 'Enabling…',
     enabled: 'Notifications enabled',
+    failed: 'Could not enable notifications. Please try again.',
   },
   navigation: {
     dashboard: 'Dashboard',
@@ -154,6 +155,7 @@ export default {
     invalidPassword: 'Invalid password. Please try again.',
     invalidLink: 'Invalid share link.',
     submit: 'View',
+    leaveSession: 'Leave shared job',
   },
 }
 

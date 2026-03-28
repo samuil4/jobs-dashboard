@@ -28,6 +28,7 @@ export default {
     enable: 'Увімкнути сповіщення',
     enabling: 'Увімкнення…',
     enabled: 'Сповіщення увімкнено',
+    failed: 'Не вдалося увімкнути сповіщення. Спробуйте ще раз.',
   },
   navigation: {
     dashboard: 'Головна',
@@ -155,6 +156,7 @@ export default {
     invalidPassword: 'Невірний пароль. Спробуйте ще раз.',
     invalidLink: 'Недійсне посилання.',
     submit: 'Переглянути',
+    leaveSession: 'Вийти з перегляду завдання',
   },
 }
 

@@ -7,6 +7,7 @@ const UUID_REGEX =
 export interface VerifyShareResult {
   valid: boolean
   job?: JobShareData
+  shareToken?: string
   error?: string
 }
 
@@ -30,7 +31,7 @@ export async function verifyJobSharePassword(
     return { valid: false, error: error.message }
   }
 
-  const result = data as { valid: boolean; job?: JobShareData; error?: string } | null
+  const result = data as { valid: boolean; job?: JobShareData; shareToken?: string; error?: string } | null
   if (!result || typeof result.valid !== 'boolean') {
     return { valid: false }
   }
