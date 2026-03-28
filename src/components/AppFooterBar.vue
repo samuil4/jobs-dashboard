@@ -76,9 +76,13 @@ watch(
 async function handleEnablePush() {
   if (props.pushMode === 'auth') {
     const ok = await subscribeWebPush()
-    if (!ok && webPushError.value) {
-      toast.error(webPushError.value)
-    } else if (ok) {
+    if (!ok) {
+      if (webPushError.value) {
+        toast.error(webPushError.value)
+      } else {
+        toast.error(t('webPush.failed'))
+      }
+    } else {
       toast.success(t('webPush.enabled'))
     }
     return
@@ -87,9 +91,13 @@ async function handleEnablePush() {
   const tok = props.shareToken
   if (!jid || !tok) return
   const ok = await subscribeSharePush(jid, tok)
-  if (!ok && sharePushError.value) {
-    toast.error(sharePushError.value)
-  } else if (ok) {
+  if (!ok) {
+    if (sharePushError.value) {
+      toast.error(sharePushError.value)
+    } else {
+      toast.error(t('webPush.failed'))
+    }
+  } else {
     toast.success(t('webPush.enabled'))
   }
 }

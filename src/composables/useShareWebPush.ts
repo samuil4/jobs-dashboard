@@ -86,8 +86,8 @@ export function useShareWebPush() {
       }
 
       const result = data as { ok?: boolean; error?: string } | null
-      if (result && !result.ok && result.error) {
-        error.value = result.error
+      if (!result || result.ok !== true) {
+        error.value = result?.error ?? 'Failed to enable share notifications'
         isSubscribing.value = false
         return false
       }

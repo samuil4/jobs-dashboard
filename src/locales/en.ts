@@ -28,6 +28,7 @@ export default {
     enable: 'Enable notifications',
     enabling: 'Enabling…',
     enabled: 'Notifications enabled',
+    failed: 'Could not enable notifications. Please try again.',
   },
   navigation: {
     dashboard: 'Dashboard',
