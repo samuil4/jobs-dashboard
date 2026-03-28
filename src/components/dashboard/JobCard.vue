@@ -153,6 +153,21 @@ function copyShareLink() {
   toastStore.show(t('jobs.setPasswordToShareHint'))
 }
 
+function handleEditClick() {
+  menuOpen.value = false
+  emit('edit', props.job.id)
+}
+
+function handleArchiveClick(archived: boolean) {
+  menuOpen.value = false
+  emit('archive', props.job.id, archived)
+}
+
+function handleDeleteClick() {
+  menuOpen.value = false
+  emit('delete', props.job.id)
+}
+
 function openFailedProductionModal() {
   menuOpen.value = false
   failedProductionModalOpen.value = true
@@ -227,6 +242,48 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item"
+              @click="handleEditClick"
+            >
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+              {{ t('jobs.editJob') }}
+            </button>
+            <button
+              v-if="job.archived"
+              type="button"
+              role="menuitem"
+              class="menu-item"
+              @click="handleArchiveClick(false)"
+            >
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" />
+                <path d="M1 3h22v5H1z" />
+                <path d="M10 12l2-2 2 2" />
+                <path d="M12 10v6" />
+              </svg>
+              {{ t('jobs.unarchive') }}
+            </button>
+            <button
+              v-else
+              type="button"
+              role="menuitem"
+              class="menu-item"
+              @click="handleArchiveClick(true)"
+            >
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" />
+                <path d="M1 3h22v5H1z" />
+                <path d="M10 12l2 2 2-2" />
+                <path d="M12 10v6" />
+              </svg>
+              {{ t('jobs.archive') }}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class="menu-item"
               @click="copyShareLink"
             >
               <svg class="share-icon menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -247,6 +304,21 @@ onUnmounted(() => {
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               {{ t('jobs.addFailedProduction') }}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class="menu-item menu-item-danger"
+              @click="handleDeleteClick"
+            >
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+              {{ t('jobs.delete') }}
             </button>
           </div>
         </div>
@@ -362,30 +434,6 @@ onUnmounted(() => {
             </div>
           </li>
         </ul>
-      </div>
-      <div class="actions">
-        <button class="btn btn-secondary" type="button" @click="emit('edit', job.id)">
-          {{ t('jobs.editJob') }}
-        </button>
-        <button
-          v-if="job.archived"
-          class="btn btn-secondary"
-          type="button"
-          @click="emit('archive', job.id, false)"
-        >
-          {{ t('jobs.unarchive') }}
-        </button>
-        <button
-          v-else
-          class="btn btn-secondary"
-          type="button"
-          @click="emit('archive', job.id, true)"
-        >
-          {{ t('jobs.archive') }}
-        </button>
-        <button class="btn btn-danger" type="button" @click="emit('delete', job.id)">
-          {{ t('jobs.delete') }}
-        </button>
       </div>
     </footer>
 
@@ -526,6 +574,10 @@ onUnmounted(() => {
 }
 
 .menu-item-fail .fail-icon {
+  color: #dc2626;
+}
+
+.menu-item-danger {
   color: #dc2626;
 }
 
@@ -798,13 +850,6 @@ onUnmounted(() => {
   gap: 18px;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
 @media (max-width: 720px) {
   .job-header {
     flex-direction: column;
@@ -813,10 +858,6 @@ onUnmounted(() => {
 
   .status {
     align-items: flex-start;
-  }
-
-  .actions {
-    justify-content: flex-start;
   }
 }
 
