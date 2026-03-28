@@ -32,29 +32,30 @@ export function useShareWebPush() {
   }
 
   async function subscribe(jobId: string, shareToken: string): Promise<boolean> {
-    if (!isSupported.value) {
-      error.value = 'Push notifications are not supported'
-      return false
-    }
-    if (!jobId || !shareToken) {
-      error.value = 'Job and token required'
-      return false
-    }
-
-    const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
-    if (!vapidPublicKey) {
-      error.value = 'VAPID public key not configured'
-      return false
-    }
+    if (isSubscribing.value) return false
 
     isSubscribing.value = true
     error.value = null
 
     try {
+      if (!isSupported.value) {
+        error.value = 'Push notifications are not supported'
+        return false
+      }
+      if (!jobId || !shareToken) {
+        error.value = 'Job and token required'
+        return false
+      }
+
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+      if (!vapidPublicKey) {
+        error.value = 'VAPID public key not configured'
+        return false
+      }
+
       const registration = await navigator.serviceWorker.getRegistration()
       if (!registration) {
         error.value = 'Service worker is not registered'
-        isSubscribing.value = false
         return false
       }
       let pushSubscription = await registration.pushManager.getSubscription()
@@ -64,7 +65,6 @@ export function useShareWebPush() {
         updatePermission()
         if (permissionResult !== 'granted') {
           error.value = 'Notification permission denied'
-          isSubscribing.value = false
           return false
         }
         const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
@@ -86,25 +86,23 @@ export function useShareWebPush() {
 
       if (invokeError) {
         error.value = invokeError.message
-        isSubscribing.value = false
         return false
       }
 
       const result = data as { ok?: boolean; error?: string } | null
       if (!result || result.ok !== true) {
         error.value = result?.error ?? 'Failed to enable share notifications'
-        isSubscribing.value = false
         return false
       }
 
       isSubscribed.value = true
-      isSubscribing.value = false
       return true
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       error.value = msg
-      isSubscribing.value = false
       return false
+    } finally {
+      isSubscribing.value = false
     }
   }
 
