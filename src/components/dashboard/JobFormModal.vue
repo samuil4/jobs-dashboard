@@ -10,6 +10,7 @@ import type { Assignee } from '../../types/job'
 const props = defineProps<{
   show: boolean
   mode: 'create' | 'edit'
+  submitting?: boolean
   initialValues?: {
     name: string
     partsNeeded: number
@@ -76,6 +77,7 @@ const submitLabel = computed(() =>
 )
 
 function handleClose() {
+  if (props.submitting) return
   emit('close')
 }
 
@@ -114,7 +116,7 @@ function handleSubmit() {
     <div class="modal">
       <header class="modal-header">
         <h2>{{ title }}</h2>
-        <button class="btn btn-ghost" type="button" @click="handleClose">
+        <button class="btn btn-ghost" type="button" :disabled="submitting" @click="handleClose">
           {{ t('common.close') }}
         </button>
       </header>
@@ -126,6 +128,7 @@ function handleSubmit() {
             id="job-name"
             v-model="form.name"
             type="text"
+            :disabled="submitting"
             :class="{ invalid: form.touched && !form.name }"
             required
           />
@@ -141,6 +144,7 @@ function handleSubmit() {
             v-model.number="form.partsNeeded"
             type="number"
             min="1"
+            :disabled="submitting"
             :class="{ invalid: form.touched && (!form.partsNeeded || form.partsNeeded <= 0) }"
             required
           />
@@ -154,6 +158,7 @@ function handleSubmit() {
           <select
             id="job-assignee"
             v-model="form.assignee"
+            :disabled="submitting"
             :class="{ invalid: form.touched && !ASSIGNEE_OPTIONS.includes(form.assignee) }"
           >
             <option v-for="assignee in ASSIGNEE_OPTIONS" :key="assignee" :value="assignee">
@@ -164,7 +169,7 @@ function handleSubmit() {
 
         <div>
           <label for="job-client">{{ t('jobs.client') }}</label>
-          <select id="job-client" v-model="form.clientId">
+          <select id="job-client" v-model="form.clientId" :disabled="submitting">
             <option value="">{{ t('jobs.clientUnassigned') }}</option>
             <option v-for="client in clientOptions" :key="client.id" :value="client.id">
               {{ client.label }} ({{ client.username }})
@@ -187,6 +192,7 @@ function handleSubmit() {
               id="job-share-password"
               v-model="form.sharePassword"
               type="text"
+              :disabled="submitting"
               :placeholder="
                 props.mode === 'edit' && props.initialValues?.hasSharePassword
                   ? t('jobs.sharePasswordReplacePlaceholder')
@@ -194,7 +200,7 @@ function handleSubmit() {
               "
               autocomplete="off"
             />
-            <button class="btn btn-secondary" type="button" @click="generateSharePassword">
+            <button class="btn btn-secondary" type="button" :disabled="submitting" @click="generateSharePassword">
               {{ t('jobs.sharePasswordGenerate') }}
             </button>
           </div>
@@ -204,11 +210,16 @@ function handleSubmit() {
         </div>
 
         <footer class="modal-footer">
-          <button class="btn btn-secondary" type="button" @click="handleClose">
+          <button class="btn btn-secondary" type="button" :disabled="submitting" @click="handleClose">
             {{ t('common.cancel') }}
           </button>
-          <button class="btn btn-primary" type="submit">
-            {{ submitLabel }}
+          <button
+            class="btn btn-primary"
+            :class="{ 'is-loading': submitting }"
+            type="submit"
+            :disabled="submitting"
+          >
+            {{ submitting ? t('common.saving') : submitLabel }}
           </button>
         </footer>
       </form>

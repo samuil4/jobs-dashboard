@@ -22,6 +22,15 @@ const { filteredJobs, loading, error } = storeToRefs(jobsStore)
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
 const editingJobId = ref<string | null>(null)
+const modalSubmitting = ref(false)
+const archiveSubmitting = ref(false)
+const deleteSubmitting = ref(false)
+const historyEditSubmitting = ref(false)
+const historyDeleteSubmitting = ref(false)
+const notesPendingIds = reactive(new Set<string>())
+const productionPendingIds = reactive(new Set<string>())
+const deliveryPendingIds = reactive(new Set<string>())
+const failedProductionPendingIds = reactive(new Set<string>())
 const deleteModal = reactive({
   show: false,
   jobId: null as string | null,
@@ -65,6 +74,26 @@ onMounted(async () => {
   await Promise.all([jobsStore.fetchJobs(), clientsStore.fetchClients()])
 })
 
+async function withPending(set: Set<string>, jobId: string, action: () => Promise<void>) {
+  if (set.has(jobId)) return
+
+  set.add(jobId)
+  try {
+    await action()
+  } finally {
+    set.delete(jobId)
+  }
+}
+
+function isJobBusy(jobId: string) {
+  return (
+    notesPendingIds.has(jobId) ||
+    productionPendingIds.has(jobId) ||
+    deliveryPendingIds.has(jobId) ||
+    failedProductionPendingIds.has(jobId)
+  )
+}
+
 function openCreateModal() {
   modalMode.value = 'create'
   editingJobId.value = null
@@ -90,6 +119,9 @@ async function handleModalSubmit(payload: {
   clientId?: string | null
   sharePassword?: string | null
 }) {
+  if (modalSubmitting.value) return
+
+  modalSubmitting.value = true
   try {
     if (modalMode.value === 'create') {
       await jobsStore.createJob(payload)
@@ -115,6 +147,8 @@ async function handleModalSubmit(payload: {
   } catch (err) {
     console.error(err)
     alert(t(modalMode.value === 'create' ? 'errors.createJob' : 'errors.updateJob'))
+  } finally {
+    modalSubmitting.value = false
   }
 }
 
@@ -134,14 +168,17 @@ function closeArchiveModal() {
 }
 
 async function confirmArchive() {
-  if (!archiveModal.jobId) return
+  if (!archiveModal.jobId || archiveSubmitting.value) return
   const shouldArchive = archiveModal.action === 'archive'
+  archiveSubmitting.value = true
   try {
     await jobsStore.archiveJob(archiveModal.jobId, shouldArchive)
     closeArchiveModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.updateJob'))
+  } finally {
+    archiveSubmitting.value = false
   }
 }
 
@@ -160,41 +197,50 @@ function closeDeleteModal() {
 }
 
 async function confirmDelete() {
-  if (!deleteModal.jobId) return
+  if (!deleteModal.jobId || deleteSubmitting.value) return
+  deleteSubmitting.value = true
   try {
     await jobsStore.deleteJob(deleteModal.jobId)
     closeDeleteModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.deleteJob'))
+  } finally {
+    deleteSubmitting.value = false
   }
 }
 
 async function handleProduction(jobId: string, delta: number) {
-  try {
-    await jobsStore.addProduction(jobId, delta, authStore.userId)
-  } catch (err) {
-    console.error(err)
-    alert(t('errors.updateProduction'))
-  }
+  await withPending(productionPendingIds, jobId, async () => {
+    try {
+      await jobsStore.addProduction(jobId, delta, authStore.userId)
+    } catch (err) {
+      console.error(err)
+      alert(t('errors.updateProduction'))
+    }
+  })
 }
 
 async function handleUpdateNotes(jobId: string, notes: string | null) {
-  try {
-    await jobsStore.updateJobNotes(jobId, notes)
-  } catch (err) {
-    console.error(err)
-    alert(t('errors.updateJob'))
-  }
+  await withPending(notesPendingIds, jobId, async () => {
+    try {
+      await jobsStore.updateJobNotes(jobId, notes)
+    } catch (err) {
+      console.error(err)
+      alert(t('errors.updateJob'))
+    }
+  })
 }
 
 async function handleDelivery(jobId: string, delta: number) {
-  try {
-    await jobsStore.addDelivery(jobId, delta, authStore.userId)
-  } catch (err) {
-    console.error(err)
-    alert(t('errors.updateProduction'))
-  }
+  await withPending(deliveryPendingIds, jobId, async () => {
+    try {
+      await jobsStore.addDelivery(jobId, delta, authStore.userId)
+    } catch (err) {
+      console.error(err)
+      alert(t('errors.updateProduction'))
+    }
+  })
 }
 
 async function handleAddFailedProduction(
@@ -202,18 +248,20 @@ async function handleAddFailedProduction(
   delta: number,
   callbacks?: { onSuccess: () => void; onError: (message: string) => void }
 ) {
-  try {
-    await jobsStore.addFailedProduction(jobId, delta, authStore.userId)
-    callbacks?.onSuccess?.()
-  } catch (err) {
-    console.error(err)
-    const message = err instanceof Error ? err.message : t('errors.addFailedProduction')
-    if (callbacks?.onError) {
-      callbacks.onError(message)
-    } else {
-      alert(t('errors.addFailedProduction'))
+  await withPending(failedProductionPendingIds, jobId, async () => {
+    try {
+      await jobsStore.addFailedProduction(jobId, delta, authStore.userId)
+      callbacks?.onSuccess?.()
+    } catch (err) {
+      console.error(err)
+      const message = err instanceof Error ? err.message : t('errors.addFailedProduction')
+      if (callbacks?.onError) {
+        callbacks.onError(message)
+      } else {
+        alert(t('errors.addFailedProduction'))
+      }
     }
-  }
+  })
 }
 
 function handleEditHistory(jobId: string, historyId: string, currentDelta: number, updateType?: UpdateType) {
@@ -233,13 +281,16 @@ function closeHistoryEditModal() {
 }
 
 async function handleSaveHistoryEdit(newDelta: number) {
-  if (!historyEditModal.jobId || !historyEditModal.historyId) return
+  if (!historyEditModal.jobId || !historyEditModal.historyId || historyEditSubmitting.value) return
+  historyEditSubmitting.value = true
   try {
     await jobsStore.updateHistoryItem(historyEditModal.jobId, historyEditModal.historyId, newDelta)
     closeHistoryEditModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.updateProduction'))
+  } finally {
+    historyEditSubmitting.value = false
   }
 }
 
@@ -263,13 +314,16 @@ function closeHistoryDeleteModal() {
 }
 
 async function confirmDeleteHistory() {
-  if (!historyDeleteModal.jobId || !historyDeleteModal.historyId) return
+  if (!historyDeleteModal.jobId || !historyDeleteModal.historyId || historyDeleteSubmitting.value) return
+  historyDeleteSubmitting.value = true
   try {
     await jobsStore.deleteHistoryItem(historyDeleteModal.jobId, historyDeleteModal.historyId)
     closeHistoryDeleteModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.updateProduction'))
+  } finally {
+    historyDeleteSubmitting.value = false
   }
 }
 
@@ -311,6 +365,11 @@ const archiveConfirmLabel = computed(() =>
         v-for="job in filteredJobs"
         :key="job.id"
         :job="job"
+        :is-busy="isJobBusy(job.id)"
+        :is-notes-saving="notesPendingIds.has(job.id)"
+        :is-production-submitting="productionPendingIds.has(job.id)"
+        :is-delivery-submitting="deliveryPendingIds.has(job.id)"
+        :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
         @edit="openEditModal"
         @archive="handleArchive"
         @delete="handleDelete"
@@ -326,6 +385,7 @@ const archiveConfirmLabel = computed(() =>
     <JobFormModal
       :show="showModal"
       :mode="modalMode"
+      :submitting="modalSubmitting"
       :initial-values="modalInitialValues"
       @close="showModal = false"
       @submit="handleModalSubmit"
@@ -337,6 +397,7 @@ const archiveConfirmLabel = computed(() =>
       :description="t('jobs.deleteModal.message', { name: deleteModal.jobName })"
       :confirm-label="t('jobs.delete')"
       confirm-variant="danger"
+      :confirming="deleteSubmitting"
       @cancel="closeDeleteModal"
       @confirm="confirmDelete"
     />
@@ -347,6 +408,7 @@ const archiveConfirmLabel = computed(() =>
       :description="archiveModalMessage"
       :confirm-label="archiveConfirmLabel"
       confirm-variant="secondary"
+      :confirming="archiveSubmitting"
       @cancel="closeArchiveModal"
       @confirm="confirmArchive"
     />
@@ -355,6 +417,7 @@ const archiveConfirmLabel = computed(() =>
       :show="historyEditModal.show"
       :current-delta="historyEditModal.currentDelta"
       :update-type="historyEditModal.updateType"
+      :submitting="historyEditSubmitting"
       @close="closeHistoryEditModal"
       @save="handleSaveHistoryEdit"
     />
@@ -368,6 +431,7 @@ const archiveConfirmLabel = computed(() =>
       })"
       :confirm-label="t('jobs.history.delete')"
       confirm-variant="danger"
+      :confirming="historyDeleteSubmitting"
       @cancel="closeHistoryDeleteModal"
       @confirm="confirmDeleteHistory"
     />

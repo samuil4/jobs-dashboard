@@ -11,6 +11,9 @@ export default {
     invalidNumber: 'Введіть додатне число',
     language: 'Мова',
     version: 'Версія',
+    saving: 'Збереження…',
+    deleting: 'Видалення…',
+    processing: 'Виконання…',
   },
   auth: {
     title: 'Панель завдань',
@@ -26,6 +29,9 @@ export default {
   pwa: {
     install: 'Встановити застосунок',
     installing: 'Встановлення…',
+    updateAvailableTitle: 'Доступне оновлення',
+    updateAvailableMessage: 'Доступна новіша версія застосунку. Поточна: v{current}. Нова: v{next}.',
+    updateNow: 'Оновити застосунок',
   },
   webPush: {
     enable: 'Увімкнути сповіщення',
