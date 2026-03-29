@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 
 import LanguageSwitcher from './LanguageSwitcher.vue'
 import { useClientWebPush } from '../composables/useClientWebPush'
+import { useAppVersion } from '../composables/useAppVersion'
 import { usePwaInstall } from '../composables/usePwaInstall'
 import { useShareWebPush } from '../composables/useShareWebPush'
 import { useWebPush } from '../composables/useWebPush'
@@ -36,6 +37,12 @@ const authStore = useAuthStore()
 const appVersion = __APP_VERSION__
 
 const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
+const {
+  previousVersion,
+  hasUpdate,
+  isRefreshing: isRefreshingApp,
+  refreshApp,
+} = useAppVersion()
 
 const {
   isSupported: webPushSupported,
@@ -155,11 +162,37 @@ const showClientPushButton = computed(
     !clientPushSubscribed.value &&
     authStore.isClient,
 )
+
+const showVersionUpdate = computed(
+  () => isInstalled.value && hasUpdate.value && previousVersion.value !== null
+)
 </script>
 
 <template>
   <footer class="app-footer">
     <div class="footer-content">
+      <div v-if="showVersionUpdate" class="update-banner">
+        <div class="update-copy">
+          <strong>{{ t('pwa.updateAvailableTitle') }}</strong>
+          <span>
+            {{
+              t('pwa.updateAvailableMessage', {
+                current: previousVersion,
+                next: appVersion,
+              })
+            }}
+          </span>
+        </div>
+        <button
+          class="btn btn-compact btn-primary"
+          :class="{ 'is-loading': isRefreshingApp }"
+          type="button"
+          :disabled="isRefreshingApp"
+          @click="refreshApp"
+        >
+          {{ isRefreshingApp ? t('common.loading') + '…' : t('pwa.updateNow') }}
+        </button>
+      </div>
       <span class="app-version" :title="`${t('common.version')} ${appVersion}`">
         v{{ appVersion }}
       </span>
@@ -231,7 +264,7 @@ const showClientPushButton = computed(
   bottom: 0;
   left: 0;
   right: 0;
-  height: 48px;
+  min-height: 48px;
   padding: 8px 16px;
   background: #fff;
   border-top: 1px solid #e5e7eb;
@@ -244,9 +277,34 @@ const showClientPushButton = computed(
   margin: 0 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   height: 100%;
+}
+
+.update-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+}
+
+.update-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #1e3a8a;
+}
+
+.update-copy strong {
+  font-size: 13px;
 }
 
 .app-version {
@@ -262,6 +320,11 @@ const showClientPushButton = computed(
 }
 
 @media (max-width: 768px) {
+  .update-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .btn-compact {
     font-size: 12px;
     padding: 6px 10px;

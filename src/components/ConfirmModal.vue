@@ -8,6 +8,7 @@ const props = defineProps<{
   description: string
   confirmLabel?: string
   confirmVariant?: 'primary' | 'danger' | 'secondary'
+  confirming?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,7 +35,7 @@ const confirmClass = computed(() => {
     <div class="modal confirm-modal">
       <header class="modal-header">
         <h2>{{ title }}</h2>
-        <button class="btn btn-ghost" type="button" @click="emit('cancel')">
+        <button class="btn btn-ghost" type="button" :disabled="confirming" @click="emit('cancel')">
           {{ t('common.close') }}
         </button>
       </header>
@@ -44,11 +45,16 @@ const confirmClass = computed(() => {
       </p>
 
       <footer class="modal-footer">
-        <button class="btn btn-secondary" type="button" @click="emit('cancel')">
+        <button class="btn btn-secondary" type="button" :disabled="confirming" @click="emit('cancel')">
           {{ t('common.cancel') }}
         </button>
-        <button :class="confirmClass" type="button" @click="emit('confirm')">
-          {{ confirmLabel ?? t('common.confirm') }}
+        <button
+          :class="[confirmClass, { 'is-loading': confirming }]"
+          type="button"
+          :disabled="confirming"
+          @click="emit('confirm')"
+        >
+          {{ confirming ? t('common.processing') : (confirmLabel ?? t('common.confirm')) }}
         </button>
       </footer>
     </div>

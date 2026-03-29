@@ -11,6 +11,11 @@ const router = useRouter()
 
 const props = defineProps<{
   job: JobWithHistory
+  isBusy?: boolean
+  isNotesSaving?: boolean
+  isProductionSubmitting?: boolean
+  isDeliverySubmitting?: boolean
+  isFailedProductionSubmitting?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -100,6 +105,7 @@ function formatHistoryEntry(delta: number, createdAt: string, updateType?: strin
 function handleNotesBlur() {
   const value = notesInput.value.trim()
   const normalized = value === '' ? null : value
+  if (normalized === (props.job.notes ?? null)) return
   emit('updateNotes', props.job.id, normalized)
 }
 
@@ -232,6 +238,7 @@ onUnmounted(() => {
             class="btn-menu-trigger"
             :aria-label="t('jobs.cardMenu')"
             :aria-expanded="menuOpen"
+            :disabled="isBusy"
             @click.stop="menuOpen = !menuOpen"
           >
             <svg class="dots-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -245,6 +252,7 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item"
+              :disabled="isBusy"
               @click="handleEditClick"
             >
               <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -258,6 +266,7 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item"
+              :disabled="isBusy"
               @click="handleArchiveClick(false)"
             >
               <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -273,6 +282,7 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item"
+              :disabled="isBusy"
               @click="handleArchiveClick(true)"
             >
               <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -287,6 +297,7 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item"
+              :disabled="isBusy"
               @click="copyShareLink"
             >
               <svg class="share-icon menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -299,6 +310,7 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item menu-item-fail"
+              :disabled="isBusy"
               @click="openFailedProductionModal"
             >
               <svg class="menu-icon fail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -312,6 +324,7 @@ onUnmounted(() => {
               type="button"
               role="menuitem"
               class="menu-item menu-item-danger"
+              :disabled="isBusy"
               @click="handleDeleteClick"
             >
               <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -367,8 +380,10 @@ onUnmounted(() => {
           class="notes-input"
           rows="2"
           maxlength="2000"
+          :disabled="isNotesSaving"
           @blur="handleNotesBlur"
         />
+        <p v-if="isNotesSaving" class="pending-hint">{{ t('common.saving') }}</p>
       </div>
 
       <form class="production-form" @submit.prevent="handleProductionSubmit">
@@ -381,9 +396,15 @@ onUnmounted(() => {
             :placeholder="t('jobs.updateProduction')"
             :aria-label="t('jobs.updateProduction')"
             class="production-input"
+            :disabled="isProductionSubmitting"
           />
-          <button class="btn btn-primary" type="submit">
-            {{ t('jobs.updateProduction') }}
+          <button
+            class="btn btn-primary"
+            :class="{ 'is-loading': isProductionSubmitting }"
+            type="submit"
+            :disabled="isProductionSubmitting"
+          >
+            {{ isProductionSubmitting ? t('common.saving') : t('jobs.updateProduction') }}
           </button>
         </div>
         <p v-if="productionError" class="error">{{ productionError }}</p>
@@ -399,9 +420,15 @@ onUnmounted(() => {
             :placeholder="t('jobs.addDelivery')"
             :aria-label="t('jobs.addDelivery')"
             class="production-input"
+            :disabled="isDeliverySubmitting"
           />
-          <button class="btn btn-primary" type="submit">
-            {{ t('jobs.addDelivery') }}
+          <button
+            class="btn btn-primary"
+            :class="{ 'is-loading': isDeliverySubmitting }"
+            type="submit"
+            :disabled="isDeliverySubmitting"
+          >
+            {{ isDeliverySubmitting ? t('common.saving') : t('jobs.addDelivery') }}
           </button>
         </div>
         <p v-if="deliveryError" class="error">{{ deliveryError }}</p>
@@ -422,6 +449,7 @@ onUnmounted(() => {
                 class="btn-icon"
                 type="button"
                 :title="t('jobs.history.edit')"
+                :disabled="isBusy"
                 @click="emit('editHistory', job.id, update.id, update.delta, update.update_type)"
               >
                 {{ t('jobs.history.edit') }}
@@ -430,6 +458,7 @@ onUnmounted(() => {
                 class="btn-icon btn-icon-danger"
                 type="button"
                 :title="t('jobs.history.delete')"
+                :disabled="isBusy"
                 @click="emit('deleteHistory', job.id, update.id)"
               >
                 {{ t('jobs.history.delete') }}
@@ -444,7 +473,13 @@ onUnmounted(() => {
       <div class="modal failed-production-modal">
         <header class="modal-header">
           <h2 :id="`failed-modal-title-${job.id}`">{{ t('jobs.failedProductionModalTitle') }}</h2>
-          <button class="btn btn-ghost" type="button" :aria-label="t('common.close')" @click="closeFailedProductionModal">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            :aria-label="t('common.close')"
+            :disabled="isFailedProductionSubmitting"
+            @click="closeFailedProductionModal"
+          >
             {{ t('common.close') }}
           </button>
         </header>
@@ -458,9 +493,15 @@ onUnmounted(() => {
               :placeholder="t('jobs.addFailedProduction')"
               :aria-label="t('jobs.addFailedProduction')"
               class="production-input"
+              :disabled="isFailedProductionSubmitting"
             />
-            <button class="btn btn-primary" type="submit">
-              {{ t('jobs.addFailedProduction') }}
+            <button
+              class="btn btn-primary"
+              :class="{ 'is-loading': isFailedProductionSubmitting }"
+              type="submit"
+              :disabled="isFailedProductionSubmitting"
+            >
+              {{ isFailedProductionSubmitting ? t('common.saving') : t('jobs.addFailedProduction') }}
             </button>
           </div>
           <p v-if="failedProductionError" class="error">{{ failedProductionError }}</p>
@@ -570,6 +611,12 @@ onUnmounted(() => {
 
 .menu-item:hover {
   background: #f3f4f6;
+}
+
+.menu-item:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  background: transparent;
 }
 
 .menu-item-fail {
@@ -683,6 +730,12 @@ onUnmounted(() => {
 .notes-input:focus {
   outline: none;
   border-color: #2563eb;
+}
+
+.pending-hint {
+  font-size: 12px;
+  color: #2563eb;
+  margin: 6px 0 0;
 }
 
 .production-form,
@@ -827,6 +880,11 @@ onUnmounted(() => {
 .btn-icon:hover {
   background: #f3f4f6;
   border-color: #9ca3af;
+}
+
+.btn-icon:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .btn-icon-danger {

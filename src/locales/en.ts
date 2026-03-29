@@ -11,6 +11,9 @@ export default {
     invalidNumber: 'Enter a positive number',
     language: 'Language',
     version: 'Version',
+    saving: 'Saving…',
+    deleting: 'Deleting…',
+    processing: 'Working…',
   },
   auth: {
     title: 'Jobs dashboard',
@@ -26,6 +29,9 @@ export default {
   pwa: {
     install: 'Install app',
     installing: 'Installing…',
+    updateAvailableTitle: 'Update available',
+    updateAvailableMessage: 'A newer app version is ready. Current: v{current}. New: v{next}.',
+    updateNow: 'Refresh app',
   },
   webPush: {
     enable: 'Enable notifications',

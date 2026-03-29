@@ -254,40 +254,19 @@ export const useJobsStore = defineStore('jobs', () => {
     const status = newPartsProduced >= job.parts_needed ? ('completed' as const) : ('active' as const)
     const now = formatISO(new Date())
 
-    const { error: jobUpdateError } = await supabase
-      .from('jobs')
-      .update({
-        parts_produced: newPartsProduced,
-        parts_overproduced: newPartsOverproduced,
-        status: job.archived ? 'archived' : status,
-        updated_at: now,
-      })
-      .eq('id', id)
+    const { data: rpcData, error: rpcError } = await supabase.rpc('add_production', {
+      p_job_id: id,
+      p_delta: delta,
+      p_updated_by: updatedBy ?? null,
+      p_created_at: now,
+    })
 
-    if (jobUpdateError) {
-      error.value = jobUpdateError.message
-      throw jobUpdateError
+    if (rpcError) {
+      error.value = rpcError.message
+      throw rpcError
     }
 
-    // Store the full delta in history (including overproduction)
-    const { data: historyInsert, error: historyError } = await supabase
-      .from('job_updates')
-      .insert({
-        job_id: id,
-        delta: delta,
-        update_type: 'production',
-        updated_by: updatedBy ?? null,
-        created_at: now,
-      })
-      .select()
-      .single()
-
-    if (historyError) {
-      error.value = historyError.message
-      throw historyError
-    }
-
-    const newHistoryRecord = historyInsert as JobUpdateRecord
+    const newHistoryRecord = parseJobUpdateRecord(rpcData)
 
     jobs.value = jobs.value.map((item) => {
       if (item.id !== id) return item

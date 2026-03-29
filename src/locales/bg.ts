@@ -11,6 +11,9 @@ export default {
     invalidNumber: 'Въведете положително число',
     language: 'Език',
     version: 'Версия',
+    saving: 'Запазване…',
+    deleting: 'Изтриване…',
+    processing: 'Изпълнение…',
   },
   auth: {
     title: 'Табло за задания',
@@ -26,6 +29,9 @@ export default {
   pwa: {
     install: 'Инсталиране на приложението',
     installing: 'Инсталиране…',
+    updateAvailableTitle: 'Налична е актуализация',
+    updateAvailableMessage: 'Има по-нова версия на приложението. Текуща: v{current}. Нова: v{next}.',
+    updateNow: 'Обнови приложението',
   },
   webPush: {
     enable: 'Включи известия',

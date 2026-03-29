@@ -12,6 +12,8 @@ const { t } = useI18n()
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
 const editingClientId = ref<string | null>(null)
+const modalSubmitting = ref(false)
+const deletingClientId = ref<string | null>(null)
 const deleteModal = reactive({
   show: false,
   clientId: null as string | null,
@@ -54,6 +56,9 @@ async function handleModalSubmit(payload: {
   companyName: string
   password?: string | null
 }) {
+  if (modalSubmitting.value) return
+
+  modalSubmitting.value = true
   try {
     if (modalMode.value === 'create') {
       await clientsStore.createClient(payload)
@@ -64,6 +69,8 @@ async function handleModalSubmit(payload: {
   } catch (err) {
     console.error(err)
     alert(t(modalMode.value === 'create' ? 'errors.createClient' : 'errors.updateClient'))
+  } finally {
+    modalSubmitting.value = false
   }
 }
 
@@ -82,13 +89,17 @@ function closeDeleteModal() {
 }
 
 async function confirmDelete() {
-  if (!deleteModal.clientId) return
+  if (!deleteModal.clientId || deletingClientId.value) return
+
+  deletingClientId.value = deleteModal.clientId
   try {
     await clientsStore.deleteClient(deleteModal.clientId)
     closeDeleteModal()
   } catch (err) {
     console.error(err)
     alert(t('errors.deleteClient'))
+  } finally {
+    deletingClientId.value = null
   }
 }
 </script>
@@ -100,7 +111,7 @@ async function confirmDelete() {
         <h1>{{ t('clients.heading') }}</h1>
         <p class="page-subtitle">{{ t('clients.subtitle') }}</p>
       </div>
-      <button class="btn btn-primary" type="button" @click="openCreateModal">
+      <button class="btn btn-primary" type="button" :disabled="modalSubmitting" @click="openCreateModal">
         {{ t('clients.addClient') }}
       </button>
     </div>
@@ -138,11 +149,22 @@ async function confirmDelete() {
               <td>{{ client.jobs_in_production }}</td>
               <td>{{ client.unstarted_jobs }}</td>
               <td class="actions-cell">
-                <button class="btn btn-secondary btn-compact" type="button" @click="openEditModal(client.id)">
+                <button
+                  class="btn btn-secondary btn-compact"
+                  :disabled="deletingClientId === client.id"
+                  type="button"
+                  @click="openEditModal(client.id)"
+                >
                   {{ t('common.edit') }}
                 </button>
-                <button class="btn btn-danger btn-compact" type="button" @click="handleDelete(client.id)">
-                  {{ t('common.delete') }}
+                <button
+                  class="btn btn-danger btn-compact"
+                  :class="{ 'is-loading': deletingClientId === client.id }"
+                  :disabled="deletingClientId === client.id"
+                  type="button"
+                  @click="handleDelete(client.id)"
+                >
+                  {{ deletingClientId === client.id ? t('common.deleting') : t('common.delete') }}
                 </button>
               </td>
             </tr>
@@ -154,6 +176,7 @@ async function confirmDelete() {
     <ClientFormModal
       :show="showModal"
       :mode="modalMode"
+      :submitting="modalSubmitting"
       :initial-values="modalInitialValues"
       @close="showModal = false"
       @submit="handleModalSubmit"
@@ -165,6 +188,7 @@ async function confirmDelete() {
       :description="t('clients.deleteMessage', { name: deleteModal.companyName })"
       :confirm-label="t('common.delete')"
       confirm-variant="danger"
+      :confirming="deletingClientId !== null"
       @cancel="closeDeleteModal"
       @confirm="confirmDelete"
     />

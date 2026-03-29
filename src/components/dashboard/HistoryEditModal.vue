@@ -8,6 +8,7 @@ const props = defineProps<{
   show: boolean
   currentDelta: number
   updateType?: UpdateType
+  submitting?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -50,6 +51,7 @@ watch(
 )
 
 function handleClose() {
+  if (props.submitting) return
   emit('close')
 }
 
@@ -70,7 +72,7 @@ function handleSubmit() {
     <div class="modal">
       <header class="modal-header">
         <h2>{{ editTitle }}</h2>
-        <button class="btn btn-ghost" type="button" @click="handleClose">
+        <button class="btn btn-ghost" type="button" :disabled="submitting" @click="handleClose">
           {{ t('common.close') }}
         </button>
       </header>
@@ -83,6 +85,7 @@ function handleSubmit() {
             v-model.number="form.delta"
             type="number"
             min="1"
+            :disabled="submitting"
             :class="{ invalid: form.touched && (!form.delta || form.delta <= 0) }"
             required
           />
@@ -92,11 +95,16 @@ function handleSubmit() {
         </div>
 
         <footer class="modal-footer">
-          <button class="btn btn-secondary" type="button" @click="handleClose">
+          <button class="btn btn-secondary" type="button" :disabled="submitting" @click="handleClose">
             {{ t('common.cancel') }}
           </button>
-          <button class="btn btn-primary" type="submit">
-            {{ t('jobs.history.save') }}
+          <button
+            class="btn btn-primary"
+            :class="{ 'is-loading': submitting }"
+            type="submit"
+            :disabled="submitting"
+          >
+            {{ submitting ? t('common.saving') : t('jobs.history.save') }}
           </button>
         </footer>
       </form>

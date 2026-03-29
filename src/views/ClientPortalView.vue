@@ -80,9 +80,17 @@ onUnmounted(() => {
         class="search-input"
         :placeholder="t('clients.searchPlaceholder')"
       />
-      <button class="btn btn-secondary" type="button" @click="toggleArchived">
+      <button
+        class="btn btn-secondary"
+        :class="{ 'is-loading': loading }"
+        type="button"
+        :disabled="loading"
+        @click="toggleArchived"
+      >
         {{
-          showArchived
+          loading
+            ? t('common.loading') + '…'
+            : showArchived
             ? t('clients.hideArchived')
             : t('clients.showArchived')
         }}

@@ -7,6 +7,7 @@ const USERNAME_REGEX = /^[A-Za-z0-9._-]{3,50}$/
 const props = defineProps<{
   show: boolean
   mode: 'create' | 'edit'
+  submitting?: boolean
   initialValues?: {
     username: string
     companyName: string
@@ -85,7 +86,7 @@ function handleSubmit() {
     <div class="modal">
       <header class="modal-header">
         <h2>{{ title }}</h2>
-        <button class="btn btn-ghost" type="button" @click="emit('close')">
+        <button class="btn btn-ghost" type="button" :disabled="submitting" @click="emit('close')">
           {{ t('common.close') }}
         </button>
       </header>
@@ -98,6 +99,7 @@ function handleSubmit() {
             v-model="form.username"
             type="text"
             autocomplete="username"
+            :disabled="submitting"
             :class="{ invalid: usernameInvalid }"
             required
           />
@@ -112,6 +114,7 @@ function handleSubmit() {
             id="client-company"
             v-model="form.companyName"
             type="text"
+            :disabled="submitting"
             :class="{ invalid: companyInvalid }"
             required
           />
@@ -127,6 +130,7 @@ function handleSubmit() {
             v-model="form.password"
             type="password"
             autocomplete="new-password"
+            :disabled="submitting"
             :placeholder="props.mode === 'edit' ? t('clients.passwordOptional') : ''"
             :class="{ invalid: passwordInvalid }"
             :required="props.mode === 'create'"
@@ -144,11 +148,16 @@ function handleSubmit() {
         </div>
 
         <footer class="modal-footer">
-          <button class="btn btn-secondary" type="button" @click="emit('close')">
+          <button class="btn btn-secondary" type="button" :disabled="submitting" @click="emit('close')">
             {{ t('common.cancel') }}
           </button>
-          <button class="btn btn-primary" type="submit">
-            {{ submitLabel }}
+          <button
+            class="btn btn-primary"
+            :class="{ 'is-loading': submitting }"
+            type="submit"
+            :disabled="submitting"
+          >
+            {{ submitting ? t('common.saving') : submitLabel }}
           </button>
         </footer>
       </form>
