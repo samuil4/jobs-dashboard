@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 
 import LanguageSwitcher from './LanguageSwitcher.vue'
+import { useClientWebPush } from '../composables/useClientWebPush'
 import { usePwaInstall } from '../composables/usePwaInstall'
 import { useShareWebPush } from '../composables/useShareWebPush'
 import { useWebPush } from '../composables/useWebPush'
@@ -12,7 +13,7 @@ import { useAuthStore } from '../stores/auth'
 
 const props = withDefaults(
   defineProps<{
-    pushMode?: 'auth' | 'share'
+    pushMode?: 'auth' | 'share' | 'client'
     shareJobId?: string
     shareToken?: string | null
     showLogout?: boolean
@@ -54,9 +55,20 @@ const {
   checkSubscription: checkSharePushSubscription,
 } = useShareWebPush()
 
+const {
+  isSupported: clientPushSupported,
+  isSubscribed: clientPushSubscribed,
+  isSubscribing: clientPushSubscribing,
+  error: clientPushError,
+  subscribe: subscribeClientPush,
+  checkSubscription: checkClientPushSubscription,
+} = useClientWebPush()
+
 function refreshPushState() {
   if (props.pushMode === 'auth' && webPushSupported.value) {
     checkWebPushSubscription()
+  } else if (props.pushMode === 'client' && clientPushSupported.value) {
+    checkClientPushSubscription()
   } else if (props.pushMode === 'share' && sharePushSupported.value) {
     checkSharePushSubscription()
   }
@@ -87,6 +99,19 @@ async function handleEnablePush() {
     }
     return
   }
+  if (props.pushMode === 'client') {
+    const ok = await subscribeClientPush()
+    if (!ok) {
+      if (clientPushError.value) {
+        toast.error(clientPushError.value)
+      } else {
+        toast.error(t('webPush.failed'))
+      }
+    } else {
+      toast.success(t('webPush.enabled'))
+    }
+    return
+  }
   const jid = props.shareJobId
   const tok = props.shareToken
   if (!jid || !tok) return
@@ -103,8 +128,9 @@ async function handleEnablePush() {
 }
 
 async function handleLogout() {
+  const redirectName = authStore.isClient ? 'clientLogin' : 'login'
   await authStore.signOut()
-  router.push({ name: 'login' })
+  router.push({ name: redirectName })
 }
 
 const showAuthPushButton = computed(
@@ -120,6 +146,14 @@ const showSharePushButton = computed(
     sharePushSupported.value &&
     !sharePushSubscribed.value &&
     Boolean(props.shareToken),
+)
+
+const showClientPushButton = computed(
+  () =>
+    props.pushMode === 'client' &&
+    clientPushSupported.value &&
+    !clientPushSubscribed.value &&
+    authStore.isClient,
 )
 </script>
 
@@ -149,6 +183,16 @@ const showSharePushButton = computed(
           @click="handleEnablePush"
         >
           {{ webPushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
+        </button>
+        <button
+          v-if="showClientPushButton"
+          class="btn btn-compact btn-secondary"
+          type="button"
+          :disabled="clientPushSubscribing"
+          :title="clientPushError ?? undefined"
+          @click="handleEnablePush"
+        >
+          {{ clientPushSubscribing ? t('webPush.enabling') : t('webPush.enable') }}
         </button>
         <button
           v-if="showSharePushButton"

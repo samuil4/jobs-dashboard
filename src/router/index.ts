@@ -10,13 +10,31 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
-      meta: { requiresAuth: false },
+      meta: { requiresAuth: false, audience: 'staff' },
+    },
+    {
+      path: '/client/login',
+      name: 'clientLogin',
+      component: () => import('../views/ClientLoginView.vue'),
+      meta: { requiresAuth: false, audience: 'client' },
     },
     {
       path: '/',
       name: 'dashboard',
       component: () => import('../views/DashboardView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, audience: 'staff' },
+    },
+    {
+      path: '/clients',
+      name: 'clients',
+      component: () => import('../views/ClientsView.vue'),
+      meta: { requiresAuth: true, audience: 'staff' },
+    },
+    {
+      path: '/client/jobs',
+      name: 'clientJobs',
+      component: () => import('../views/ClientPortalView.vue'),
+      meta: { requiresAuth: true, audience: 'client' },
     },
     {
       path: '/share/:jobId',
@@ -38,12 +56,29 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   const requiresAuth = to.meta.requiresAuth !== false
+  const audience = to.meta.audience as 'staff' | 'client' | undefined
+
   if (requiresAuth && !authStore.isAuthenticated) {
-    return next({ name: 'login', query: { redirect: to.fullPath } })
+    return next({
+      name: audience === 'client' ? 'clientLogin' : 'login',
+      query: { redirect: to.fullPath },
+    })
+  }
+
+  if (authStore.isAuthenticated && authStore.isClient && audience === 'staff') {
+    return next({ name: 'clientJobs' })
+  }
+
+  if (authStore.isAuthenticated && authStore.isStaff && audience === 'client') {
+    return next({ name: 'dashboard' })
   }
 
   if (to.name === 'login' && authStore.isAuthenticated) {
-    return next({ name: 'dashboard' })
+    return next({ name: authStore.isClient ? 'clientJobs' : 'dashboard' })
+  }
+
+  if (to.name === 'clientLogin' && authStore.isAuthenticated) {
+    return next({ name: authStore.isClient ? 'clientJobs' : 'dashboard' })
   }
 
   return next()

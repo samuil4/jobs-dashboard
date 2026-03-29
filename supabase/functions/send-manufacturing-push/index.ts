@@ -34,6 +34,13 @@ interface PushSubscriptionRow {
   subscription: WebPushSubscription
 }
 
+interface ClientPushSubscriptionRow {
+  id: string
+  client_id: string
+  user_id: string
+  subscription: WebPushSubscription
+}
+
 interface SharePushSubscriptionRow {
   id: string
   job_id: string
@@ -78,11 +85,12 @@ Deno.serve(async (req) => {
 
     const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select('name')
+      .select('name, client_id')
       .eq('id', record.job_id)
       .single()
 
     const jobName = job?.name ?? record.job_id
+    const clientId = job?.client_id ?? null
     if (jobError) {
       console.warn('Failed to fetch job name:', jobError)
     }
@@ -110,18 +118,25 @@ Deno.serve(async (req) => {
         body = `Job ${jobName}: +${delta} parts`
     }
 
-    const [dashboardResult, shareResult] = await Promise.all([
+    const [dashboardResult, shareResult, clientResult] = await Promise.all([
       supabase.from('push_subscriptions').select('id, user_id, subscription'),
       supabase
         .from('share_push_subscriptions')
         .select('id, job_id, subscription')
         .eq('job_id', record.job_id),
+      clientId
+        ? supabase
+            .from('client_push_subscriptions')
+            .select('id, client_id, user_id, subscription')
+            .eq('client_id', clientId)
+        : Promise.resolve({ data: [], error: null }),
     ])
 
     const dashboardSubs = (dashboardResult.error ? [] : dashboardResult.data ?? []) as PushSubscriptionRow[]
     const shareSubs = (shareResult.error ? [] : shareResult.data ?? []) as SharePushSubscriptionRow[]
+    const clientSubs = (clientResult.error ? [] : clientResult.data ?? []) as ClientPushSubscriptionRow[]
 
-    if (!dashboardSubs.length && !shareSubs.length) {
+    if (!dashboardSubs.length && !shareSubs.length && !clientSubs.length) {
       return new Response(
         JSON.stringify({ ok: true, sent: 0, message: 'No push subscriptions' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -139,6 +154,7 @@ Deno.serve(async (req) => {
     let sent = 0
     const dashboardGone: string[] = []
     const shareGone: string[] = []
+    const clientGone: string[] = []
 
     async function sendToSub(
       row: { id: string; subscription: WebPushSubscription },
@@ -165,6 +181,9 @@ Deno.serve(async (req) => {
     for (const row of dashboardSubs) {
       await sendToSub(row, dashboardGone)
     }
+    for (const row of clientSubs) {
+      await sendToSub(row, clientGone)
+    }
     for (const row of shareSubs) {
       await sendToSub(row, shareGone)
     }
@@ -175,12 +194,15 @@ Deno.serve(async (req) => {
     if (shareGone.length > 0) {
       await supabase.from('share_push_subscriptions').delete().in('id', shareGone)
     }
+    if (clientGone.length > 0) {
+      await supabase.from('client_push_subscriptions').delete().in('id', clientGone)
+    }
 
     return new Response(
       JSON.stringify({
         ok: true,
         sent,
-        gone: dashboardGone.length + shareGone.length,
+        gone: dashboardGone.length + shareGone.length + clientGone.length,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

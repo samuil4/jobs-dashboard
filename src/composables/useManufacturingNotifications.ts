@@ -67,7 +67,7 @@ export function useManufacturingNotifications() {
 
   function subscribe() {
     if (channel) return
-    if (!authStore.isAuthenticated) return
+    if (!authStore.isAuthenticated || authStore.isClient) return
     channel = supabase
       .channel('job-updates')
       .on(
@@ -94,9 +94,9 @@ export function useManufacturingNotifications() {
   onMounted(() => {
     subscribe()
     stopWatch = watch(
-      () => authStore.isAuthenticated,
-      (isAuth) => {
-        if (isAuth) {
+      () => [authStore.isAuthenticated, authStore.userRole] as const,
+      ([isAuth, userRole]) => {
+        if (isAuth && userRole === 'staff') {
           subscribe()
         } else {
           unsubscribe()

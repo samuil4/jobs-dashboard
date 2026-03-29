@@ -1,10 +1,10 @@
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import { supabase } from '../lib/supabase'
 import { urlBase64ToUint8Array } from '../lib/webPushUtils'
 import { useAuthStore } from '../stores/auth'
 
-export function useWebPush() {
+export function useClientWebPush() {
   const authStore = useAuthStore()
   const permission = ref<NotificationPermission>('default')
   const isSupported = computed(
@@ -25,13 +25,54 @@ export function useWebPush() {
     }
   }
 
+  async function persistSubscription(subscription: PushSubscription): Promise<void> {
+    const userId = authStore.userId
+    const clientId = authStore.clientId
+    const updatedAt = new Date().toISOString()
+
+    if (!userId || !clientId) {
+      throw new Error('Client session is required')
+    }
+
+    const { data: existingRow, error: lookupError } = await supabase
+      .from('client_push_subscriptions')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (lookupError) throw lookupError
+
+    if (existingRow?.id) {
+      const { error: updateError } = await supabase
+        .from('client_push_subscriptions')
+        .update({
+          subscription: subscription.toJSON(),
+          updated_at: updatedAt,
+        })
+        .eq('id', existingRow.id)
+
+      if (updateError) throw updateError
+      return
+    }
+
+    const { error: insertError } = await supabase.from('client_push_subscriptions').insert({
+      client_id: clientId,
+      user_id: userId,
+      subscription: subscription.toJSON(),
+      updated_at: updatedAt,
+    })
+
+    if (insertError) throw insertError
+  }
+
   async function subscribe(): Promise<boolean> {
     if (!isSupported.value) {
       error.value = 'Push notifications are not supported'
       return false
     }
-    if (!authStore.isAuthenticated) {
-      error.value = 'Sign in to enable push notifications'
+    if (!authStore.isAuthenticated || !authStore.clientId) {
+      error.value = 'Client sign in is required'
       return false
     }
 
@@ -51,6 +92,7 @@ export function useWebPush() {
         isSubscribing.value = false
         return false
       }
+
       const existingSubscription = await registration.pushManager.getSubscription()
       if (existingSubscription) {
         await persistSubscription(existingSubscription)
@@ -78,24 +120,10 @@ export function useWebPush() {
       isSubscribing.value = false
       return true
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      error.value = msg
+      error.value = err instanceof Error ? err.message : String(err)
       isSubscribing.value = false
       return false
     }
-  }
-
-  async function persistSubscription(subscription: PushSubscription): Promise<void> {
-    const userId = authStore.userId
-    if (!userId) throw new Error('Not authenticated')
-
-    const { error: insertError } = await supabase.from('push_subscriptions').insert({
-      user_id: userId,
-      subscription: subscription.toJSON(),
-      updated_at: new Date().toISOString(),
-    })
-
-    if (insertError) throw insertError
   }
 
   async function checkSubscription() {
@@ -107,6 +135,7 @@ export function useWebPush() {
         updatePermission()
         return
       }
+
       const subscription = await registration.pushManager.getSubscription()
       isSubscribed.value = !!subscription
     } catch {

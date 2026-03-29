@@ -26,12 +26,12 @@ async function handleSubmit() {
   localError.value = null
 
   try {
-    await authStore.signIn(username.value, password.value)
-    const redirect = (route.query.redirect as string) ?? '/'
-    router.replace(authStore.isClient ? '/client/jobs' : redirect)
+    await authStore.signIn(username.value, password.value, 'client')
+    const redirect = (route.query.redirect as string | undefined) ?? '/client/jobs'
+    router.replace(authStore.isClient ? redirect : '/')
   } catch (err) {
     console.error(err)
-    localError.value = t('auth.error')
+    localError.value = t('clients.loginError')
   } finally {
     submitting.value = false
   }
@@ -42,24 +42,24 @@ async function handleSubmit() {
   <div class="login-page">
     <div class="login-card card">
       <div class="login-header">
-        <div class="badge badge-warning">Manufacturing</div>
-        <h1>{{ t('auth.title') }}</h1>
-        <p>{{ t('auth.subtitle') }}</p>
+        <div class="badge badge-warning">{{ t('clients.portalBadge') }}</div>
+        <h1>{{ t('clients.loginTitle') }}</h1>
+        <p>{{ t('clients.loginSubtitle') }}</p>
       </div>
 
       <form class="login-form" @submit.prevent="handleSubmit">
-        <label for="username">{{ t('auth.username') }}</label>
+        <label for="client-username">{{ t('clients.username') }}</label>
         <input
-          id="username"
+          id="client-username"
           v-model="username"
           type="text"
           autocomplete="username"
           required
         />
 
-        <label for="password">{{ t('auth.password') }}</label>
+        <label for="client-password">{{ t('clients.password') }}</label>
         <input
-          id="password"
+          id="client-password"
           v-model="password"
           type="password"
           autocomplete="current-password"
@@ -72,10 +72,6 @@ async function handleSubmit() {
           <span v-if="submitting">{{ t('auth.signingIn') }}</span>
           <span v-else>{{ t('auth.signIn') }}</span>
         </button>
-
-        <RouterLink class="btn btn-secondary login-switch-link" to="/client/login">
-          {{ t('auth.clientLogin') }}
-        </RouterLink>
       </form>
 
       <div class="login-footer">
@@ -121,11 +117,6 @@ async function handleSubmit() {
   flex-direction: column;
 }
 
-.login-switch-link {
-  margin-top: 12px;
-  text-decoration: none;
-}
-
 .error {
   color: #dc2626;
   font-size: 13px;
@@ -138,4 +129,3 @@ async function handleSubmit() {
   justify-content: flex-end;
 }
 </style>
-
