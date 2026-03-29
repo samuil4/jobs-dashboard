@@ -98,6 +98,7 @@ function generateSharePassword() {
 }
 
 function handleSubmit() {
+  if (props.submitting) return
   form.touched = true
   if (!validate()) return
 
