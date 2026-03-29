@@ -12,15 +12,19 @@ function readStoredVersion() {
     return
   }
 
-  const storedVersion = window.localStorage.getItem(APP_VERSION_STORAGE_KEY)
+  try {
+    const storedVersion = window.localStorage.getItem(APP_VERSION_STORAGE_KEY)
 
-  if (!storedVersion) {
-    window.localStorage.setItem(APP_VERSION_STORAGE_KEY, buildVersion)
+    if (!storedVersion) {
+      window.localStorage.setItem(APP_VERSION_STORAGE_KEY, buildVersion)
+      previousVersion.value = buildVersion
+      return
+    }
+
+    previousVersion.value = storedVersion
+  } catch {
     previousVersion.value = buildVersion
-    return
   }
-
-  previousVersion.value = storedVersion
 }
 
 readStoredVersion()
@@ -45,6 +49,8 @@ export function useAppVersion() {
           registrations.map(async (registration) => {
             try {
               await registration.update()
+              const targetWorker = registration.waiting ?? registration.active
+              targetWorker?.postMessage({ type: 'SKIP_WAITING' })
             } catch (error) {
               console.warn('Failed to refresh service worker registration', error)
             }

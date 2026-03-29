@@ -1,12 +1,20 @@
 /// <reference lib="webworker" />
 
-import { clientsClaim } from 'workbox-core'
 import { precacheAndRoute } from 'workbox-precaching'
 
 declare let self: ServiceWorkerGlobalScope
 
-self.skipWaiting()
-clientsClaim()
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'SKIP_WAITING') return
+
+  event.waitUntil(
+    Promise.all([
+      self.skipWaiting(),
+      self.clients.claim(),
+    ])
+  )
+})
+
 precacheAndRoute(self.__WB_MANIFEST)
 
 self.addEventListener('push', (event: PushEvent) => {
