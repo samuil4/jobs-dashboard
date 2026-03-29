@@ -20,7 +20,8 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   async function fetchJobs(clientId: string, includeArchived = showArchived.value) {
     loading.value = true
     error.value = null
-    activeClientId.value = clientId
+    jobs.value = []
+    activeClientId.value = null
 
     let query = supabase
       .from('jobs')
@@ -36,21 +37,26 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
 
     if (fetchError) {
       error.value = fetchError.message
+      jobs.value = []
+      showArchived.value = false
       loading.value = false
       return
     }
 
     jobs.value = (data ?? []) as ClientJobRecord[]
     showArchived.value = includeArchived
+    activeClientId.value = clientId
     loading.value = false
   }
 
   function mergeJobUpdate(update: JobUpdateRecord) {
-    let matched = false
+    const displayedJobIds = new Set(jobs.value.map((job) => job.id))
+    if (!displayedJobIds.has(update.job_id)) {
+      return
+    }
 
     jobs.value = jobs.value.map((job) => {
       if (job.id !== update.job_id) return job
-      matched = true
 
       const updateType = (update.update_type ?? 'production') as UpdateType
       let partsProduced = job.parts_produced
@@ -80,10 +86,6 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
         updated_at: update.created_at,
       }
     })
-
-    if (!matched && activeClientId.value) {
-      void fetchJobs(activeClientId.value, showArchived.value)
-    }
   }
 
   function subscribe(clientId: string) {
@@ -118,7 +120,10 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
       supabase.removeChannel(channel)
       channel = null
     }
+    jobs.value = []
     activeClientId.value = null
+    showArchived.value = false
+    error.value = null
   }
 
   async function toggleArchived(clientId: string) {
