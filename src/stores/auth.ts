@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { Session, User } from '@supabase/supabase-js'
 
-import { supabase } from '../lib/supabase'
+import { supabase, SUPABASE_AUTH_STORAGE_KEY } from '../lib/supabase'
 import type { ClientRecord } from '../types/client'
 
 const AUTH_EMAIL_DOMAIN = import.meta.env.VITE_SUPABASE_AUTH_EMAIL_DOMAIN ?? 'example.com'
@@ -104,6 +104,52 @@ export const useAuthStore = defineStore('auth', () => {
     clientProfile.value = null
   }
 
+  async function rehydrateFromStorage(): Promise<boolean> {
+    try {
+      const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY)
+      if (!raw) return false
+
+      const stored: { access_token?: string; refresh_token?: string } = JSON.parse(raw)
+      if (!stored.access_token || !stored.refresh_token) return false
+
+      const { data, error: setError } = await supabase.auth.setSession({
+        access_token: stored.access_token,
+        refresh_token: stored.refresh_token,
+      })
+
+      if (setError || !data.session) return false
+
+      session.value = data.session
+      user.value = data.session.user
+      await resolveAccessProfile(data.session.user?.id ?? null)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function withTokenRecovery<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message.toLowerCase() : ''
+      const isInvalidRefreshToken =
+        msg.includes('invalid refresh token') ||
+        msg.includes('refresh_token_not_found') ||
+        (err as { code?: string })?.code === 'invalid_grant'
+
+      if (isInvalidRefreshToken) {
+        const recovered = await rehydrateFromStorage()
+        if (recovered) {
+          return await fn()
+        }
+        await signOut()
+      }
+
+      throw err
+    }
+  }
+
   const isAuthenticated = computed(() => Boolean(session.value))
   const userEmail = computed(() => user.value?.email ?? null)
   const userId = computed(() => user.value?.id ?? null)
@@ -132,6 +178,8 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signOut,
     resolveAccessProfile,
+    rehydrateFromStorage,
+    withTokenRecovery,
   }
 })
 
