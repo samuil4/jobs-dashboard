@@ -31,6 +31,8 @@ type NormalizedSelectedJobRow = JobRecord & {
 export const useJobsStore = defineStore('jobs', () => {
   const jobs = ref<JobWithHistory[]>([])
   const loading = ref(false)
+  /** Coordinates concurrent `fetchJobs` so `loading` clears when the last call finishes. */
+  let fetchJobsInFlight = 0
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const statusFilter = ref<StatusFilter>('all')
@@ -54,26 +56,34 @@ export const useJobsStore = defineStore('jobs', () => {
   }
 
   async function fetchJobs() {
+    fetchJobsInFlight += 1
     loading.value = true
     error.value = null
-    const { data, error: fetchError } = await supabase
-      .from('jobs')
-      .select(JOB_SELECT_FIELDS)
-      .order('created_at', { ascending: false })
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('jobs')
+        .select(JOB_SELECT_FIELDS)
+        .order('created_at', { ascending: false })
 
-    if (fetchError) {
-      error.value = fetchError.message
-      loading.value = false
-      return
+      if (fetchError) {
+        error.value = fetchError.message
+        return
+      }
+
+      jobs.value =
+        data?.map((item) => {
+          const { job_updates, ...rest } = parseSelectedJobRow(item)
+          return withHistory(rest, job_updates)
+        }) ?? []
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      fetchJobsInFlight -= 1
+      if (fetchJobsInFlight <= 0) {
+        fetchJobsInFlight = 0
+        loading.value = false
+      }
     }
-
-    jobs.value =
-      data?.map((item) => {
-        const { job_updates, ...rest } = parseSelectedJobRow(item)
-        return withHistory(rest, job_updates)
-      }) ?? []
-
-    loading.value = false
   }
 
   async function createJob(payload: NewJobPayload) {
@@ -182,7 +192,9 @@ export const useJobsStore = defineStore('jobs', () => {
   async function archiveJob(id: string, archivedValue: boolean) {
     error.value = null
     const job = jobs.value.find((j) => j.id === id)
-    if (!job) return
+    if (!job) {
+      throw new Error('Job not found in the current list. Try refreshing the page.')
+    }
 
     const status = archivedValue
       ? ('archived' as const)
