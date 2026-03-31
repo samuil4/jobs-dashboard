@@ -70,7 +70,17 @@ export const useAuthStore = defineStore('auth', () => {
         try {
           session.value = newSession ?? null
           user.value = newSession?.user ?? null
-          await resolveAccessProfile(newSession?.user?.id ?? null)
+          // IMPORTANT: do not await Supabase queries here.
+          // Auth-js may invoke this callback while holding its internal session lock
+          // (e.g. during recover/refresh). Awaiting DB calls here can deadlock
+          // because those calls need to read the session too.
+          void Promise.resolve().then(async () => {
+            try {
+              await resolveAccessProfile(newSession?.user?.id ?? null)
+            } catch (err) {
+              console.error('Failed to resolve access profile after auth state change', err)
+            }
+          })
         } catch (err) {
           console.error('Failed to resolve access profile after auth state change', err)
         }

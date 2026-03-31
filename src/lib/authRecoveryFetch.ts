@@ -1,4 +1,4 @@
-import type { Session, SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** Only refresh-token failures should trigger storage rehydration (not e.g. password grant). */
 function isRefreshTokenGrantRequest(url: string, init?: RequestInit): boolean {
@@ -18,64 +18,6 @@ function isInvalidRefreshTokenErrorBody(text: string): boolean {
   return t.includes('invalid refresh token') || t.includes('invalid refresh_token')
 }
 
-function readPersistedSessionJson(
-  storageKey: string,
-): { access_token: string; refresh_token: string } | null {
-  if (typeof localStorage === 'undefined') return null
-  const raw = localStorage.getItem(storageKey)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      !('access_token' in parsed) ||
-      !('refresh_token' in parsed)
-    ) {
-      return null
-    }
-    const access_token = (parsed as { access_token: unknown }).access_token
-    const refresh_token = (parsed as { refresh_token: unknown }).refresh_token
-    if (typeof access_token !== 'string' || typeof refresh_token !== 'string') return null
-    return { access_token, refresh_token }
-  } catch {
-    return null
-  }
-}
-
-async function rehydrateSessionFromStorage(
-  client: SupabaseClient,
-  storageKey: string,
-): Promise<Session | null> {
-  const tokens = readPersistedSessionJson(storageKey)
-  if (!tokens) return null
-  const { data, error } = await client.auth.setSession({
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-  })
-  if (error || !data.session) return null
-  return data.session
-}
-
-function tokenRefreshSuccessResponse(session: Session): Response {
-  const expiresAt = session.expires_at ?? 0
-  const expiresIn =
-    session.expires_in ?? Math.max(60, expiresAt - Math.floor(Date.now() / 1000))
-  const body = {
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-    expires_in: expiresIn,
-    expires_at: expiresAt,
-    token_type: session.token_type ?? 'bearer',
-    user: session.user,
-  }
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    statusText: 'OK',
-    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-  })
-}
-
 export type AuthFatalHandler = (client: SupabaseClient) => Promise<void>
 
 let fatalAuthHandler: AuthFatalHandler | null = null
@@ -88,7 +30,15 @@ async function handleFatalAuthFailure(client: SupabaseClient): Promise<void> {
   if (fatalAuthHandler) {
     await fatalAuthHandler(client)
   } else {
-    await client.auth.signOut({ scope: 'local' })
+    // Avoid calling into auth-js during a potentially locked/deadlocked refresh flow.
+    try {
+      const key = (client as unknown as { auth?: { storageKey?: string } })?.auth?.storageKey
+      if (typeof localStorage !== 'undefined') {
+        if (typeof key === 'string' && key) localStorage.removeItem(key)
+      }
+    } catch {
+      // ignore
+    }
     const base = import.meta.env.BASE_URL || '/'
     const loginPath = base.endsWith('/') ? `${base}login` : `${base}/login`
     window.location.href = loginPath
@@ -132,17 +82,26 @@ export function createInvalidRefreshRecoveryFetch(
       return response
     }
 
-    if (!isInvalidRefreshTokenErrorBody(bodyText)) return response
+    const matchedInvalid = isInvalidRefreshTokenErrorBody(bodyText)
+    if (!matchedInvalid) return response
 
     const client = getClient()
-    if (!client) return response
-
-    const session = await rehydrateSessionFromStorage(client, storageKey)
-    if (!session) {
-      await handleFatalAuthFailure(client)
+    if (!client) {
       return response
     }
 
-    return tokenRefreshSuccessResponse(session)
+    // IMPORTANT: Do NOT call `client.auth.setSession()` here.
+    // This fetch wrapper runs during refresh-token exchange while auth-js holds its internal lock.
+    // Calling back into auth-js from here can deadlock the lock queue and freeze the app.
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(storageKey)
+      }
+    } catch {
+      // ignore
+    }
+    // Fire-and-forget navigation away; don't await to avoid lock-related hangs.
+    void handleFatalAuthFailure(client)
+    return response
   }
 }

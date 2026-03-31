@@ -10,7 +10,6 @@ import { useAuthStore } from './stores/auth'
 import './assets/main.css'
 
 setAuthFatalHandler(async (client) => {
-  await client.auth.signOut({ scope: 'local' })
   const authStore = useAuthStore(pinia)
   authStore.$patch({
     session: null,
@@ -19,6 +18,13 @@ setAuthFatalHandler(async (client) => {
     clientProfile: null,
     error: null,
   })
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('jobs-dashboard-auth')
+    }
+  } catch {
+    // ignore
+  }
   const path = typeof window !== 'undefined' ? window.location.pathname : ''
   await router.replace({
     name: path.startsWith('/client') ? 'clientLogin' : 'login',
