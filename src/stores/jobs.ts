@@ -293,24 +293,47 @@ export const useJobsStore = defineStore('jobs', () => {
     })
   }
 
+  function matchesSearch(job: JobWithHistory, query: string): boolean {
+    if (!query) return true
+    return (
+      job.name.toLowerCase().includes(query) ||
+      job.assignee.toLowerCase().includes(query) ||
+      (job.client?.company_name?.toLowerCase().includes(query) ?? false) ||
+      (job.client?.username?.toLowerCase().includes(query) ?? false)
+    )
+  }
+
   const filteredJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
     return jobs.value.filter((job) => {
       if (!showArchived.value && job.archived && statusFilter.value !== 'archived') {
         return false
       }
-
       if (statusFilter.value !== 'all' && job.status !== statusFilter.value) {
         return false
       }
+      return matchesSearch(job, query)
+    })
+  })
 
-      if (!query) return true
-      return (
-        job.name.toLowerCase().includes(query) ||
-        job.assignee.toLowerCase().includes(query) ||
-        job.client?.company_name?.toLowerCase().includes(query) ||
-        job.client?.username?.toLowerCase().includes(query)
-      )
+  const filteredActiveJobs = computed(() => {
+    const query = searchTerm.value.trim().toLowerCase()
+    if (statusFilter.value !== 'all' && statusFilter.value !== 'active') return []
+    return jobs.value.filter((job) => {
+      if (job.status !== 'active') return false
+      return matchesSearch(job, query)
+    })
+  })
+
+  const filteredCompletedJobs = computed(() => {
+    const query = searchTerm.value.trim().toLowerCase()
+    if (statusFilter.value !== 'all' && statusFilter.value !== 'completed' && statusFilter.value !== 'archived') {
+      return []
+    }
+    return jobs.value.filter((job) => {
+      if (job.status !== 'completed' && job.status !== 'archived') return false
+      if (statusFilter.value !== 'all' && job.status !== statusFilter.value) return false
+      return matchesSearch(job, query)
     })
   })
 
@@ -806,6 +829,8 @@ export const useJobsStore = defineStore('jobs', () => {
     statusFilter,
     showArchived,
     filteredJobs,
+    filteredActiveJobs,
+    filteredCompletedJobs,
     fetchJobs,
     createJob,
     updateJob,
