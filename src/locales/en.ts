@@ -133,6 +133,11 @@ export default {
     productionDelta: 'Produced quantity',
     deltaHelp:
       'Enter how many additional parts were produced. Overproduction beyond requested amount will be tracked separately and recorded in history.',
+    completedColumn: 'Completed & Archived',
+    collapseColumn: 'Collapse completed jobs panel',
+    expandColumn: 'Expand completed jobs panel',
+    activeEmpty: 'No active jobs match your filters.',
+    completedEmpty: 'No completed or archived jobs.',
     filter: {
       showArchived: 'Show archived',
       hideArchived: 'Hide archived',

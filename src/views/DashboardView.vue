@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, reactive, ref, type Ref } from 'vue'
+import { computed, inject, onMounted, reactive, ref, watch, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
@@ -17,7 +17,29 @@ const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
 
-const { filteredJobs, loading, error } = storeToRefs(jobsStore)
+const { filteredActiveJobs, filteredCompletedJobs, loading, error } = storeToRefs(jobsStore)
+
+const LS_HIDE_ARCHIVED_KEY = 'dashboard:hideArchivedInColumn'
+
+const completedColumnCollapsed = ref(false)
+const hideArchivedInColumn = ref(
+  typeof localStorage !== 'undefined' && localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
+)
+
+watch(hideArchivedInColumn, (val) => {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(LS_HIDE_ARCHIVED_KEY, String(val))
+})
+
+function toggleCompletedColumn() {
+  completedColumnCollapsed.value = !completedColumnCollapsed.value
+}
+
+const visibleCompletedJobs = computed(() =>
+  hideArchivedInColumn.value
+    ? filteredCompletedJobs.value.filter((job) => job.status !== 'archived')
+    : filteredCompletedJobs.value,
+)
 
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
@@ -246,7 +268,7 @@ async function handleDelivery(jobId: string, delta: number) {
 async function handleAddFailedProduction(
   jobId: string,
   delta: number,
-  callbacks?: { onSuccess: () => void; onError: (message: string) => void }
+  callbacks?: { onSuccess: () => void; onError: (message: string) => void },
 ) {
   await withPending(failedProductionPendingIds, jobId, async () => {
     try {
@@ -264,7 +286,12 @@ async function handleAddFailedProduction(
   })
 }
 
-function handleEditHistory(jobId: string, historyId: string, currentDelta: number, updateType?: UpdateType) {
+function handleEditHistory(
+  jobId: string,
+  historyId: string,
+  currentDelta: number,
+  updateType?: UpdateType,
+) {
   historyEditModal.jobId = jobId
   historyEditModal.historyId = historyId
   historyEditModal.currentDelta = currentDelta
@@ -314,7 +341,8 @@ function closeHistoryDeleteModal() {
 }
 
 async function confirmDeleteHistory() {
-  if (!historyDeleteModal.jobId || !historyDeleteModal.historyId || historyDeleteSubmitting.value) return
+  if (!historyDeleteModal.jobId || !historyDeleteModal.historyId || historyDeleteSubmitting.value)
+    return
   historyDeleteSubmitting.value = true
   try {
     await jobsStore.deleteHistoryItem(historyDeleteModal.jobId, historyDeleteModal.historyId)
@@ -327,60 +355,116 @@ async function confirmDeleteHistory() {
   }
 }
 
-
 const archiveModalTitle = computed(() =>
   archiveModal.action === 'archive'
     ? t('jobs.archiveModal.archiveTitle')
-    : t('jobs.archiveModal.unarchiveTitle')
+    : t('jobs.archiveModal.unarchiveTitle'),
 )
 
 const archiveModalMessage = computed(() =>
   archiveModal.action === 'archive'
     ? t('jobs.archiveModal.archiveMessage', { name: archiveModal.jobName })
-    : t('jobs.archiveModal.unarchiveMessage', { name: archiveModal.jobName })
+    : t('jobs.archiveModal.unarchiveMessage', { name: archiveModal.jobName }),
 )
 
 const archiveConfirmLabel = computed(() =>
-  archiveModal.action === 'archive' ? t('jobs.archive') : t('jobs.unarchive')
+  archiveModal.action === 'archive' ? t('jobs.archive') : t('jobs.unarchive'),
 )
 </script>
 
 <template>
   <section class="dashboard">
+    <!-- ── Fixed completed-jobs drawer ── -->
+    <aside class="completed-column" :class="{ 'is-collapsed': completedColumnCollapsed }">
+      <!-- Slide-in panel -->
+      <div v-show="!completedColumnCollapsed" class="drawer-panel">
+        <div class="column-header">
+          <h2 class="column-heading">{{ t('jobs.completedColumn') }}</h2>
+          <button
+            type="button"
+            class="btn-archived-toggle"
+            :class="{ 'is-active': hideArchivedInColumn }"
+            @click="hideArchivedInColumn = !hideArchivedInColumn"
+          >
+            {{
+              hideArchivedInColumn ? t('jobs.filter.showArchived') : t('jobs.filter.hideArchived')
+            }}
+          </button>
+        </div>
 
-    <div v-if="loading" class="card state">
-      {{ t('common.loading') }}…
-    </div>
+        <div class="completed-column-body">
+          <div
+            v-if="!loading && !error && visibleCompletedJobs.length === 0"
+            class="card state state-compact"
+          >
+            {{ t('jobs.completedEmpty') }}
+          </div>
+
+          <JobCard
+            v-for="job in visibleCompletedJobs"
+            :key="job.id"
+            variant="completed"
+            :job="job"
+            :is-busy="isJobBusy(job.id)"
+            :is-notes-saving="notesPendingIds.has(job.id)"
+            :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
+            @edit="openEditModal"
+            @archive="handleArchive"
+            @delete="handleDelete"
+            @editHistory="handleEditHistory"
+            @deleteHistory="handleDeleteHistory"
+            @addFailedProduction="handleAddFailedProduction"
+          />
+        </div>
+      </div>
+
+      <!-- Always-visible handle tab -->
+      <button
+        type="button"
+        class="column-toggle-btn"
+        :aria-label="completedColumnCollapsed ? t('jobs.expandColumn') : t('jobs.collapseColumn')"
+        @click="toggleCompletedColumn"
+      >
+        <span class="column-toggle-icon" aria-hidden="true">
+          {{ completedColumnCollapsed ? '›' : '‹' }}
+        </span>
+      </button>
+    </aside>
+
+    <!-- ── Main content: full-width active jobs ── -->
+    <div v-if="loading" class="card state">{{ t('common.loading') }}…</div>
 
     <div v-else-if="error" class="card state error">
       {{ t('errors.loadJobs') }}
     </div>
 
-    <div v-else-if="filteredJobs.length === 0" class="card state">
-      {{ t('jobs.empty') }}
-    </div>
+    <template v-else>
+      <div v-if="filteredActiveJobs.length === 0" class="card state">
+        {{ t('jobs.activeEmpty') }}
+      </div>
 
-    <div v-else class="jobs-grid">
-      <JobCard
-        v-for="job in filteredJobs"
-        :key="job.id"
-        :job="job"
-        :is-busy="isJobBusy(job.id)"
-        :is-notes-saving="notesPendingIds.has(job.id)"
-        :is-production-submitting="productionPendingIds.has(job.id)"
-        :is-delivery-submitting="deliveryPendingIds.has(job.id)"
-        :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
-        @edit="openEditModal"
-        @archive="handleArchive"
-        @delete="handleDelete"
-        @production="handleProduction"
-        @editHistory="handleEditHistory"
-        @deleteHistory="handleDeleteHistory"
-        @updateNotes="handleUpdateNotes"
-        @delivery="handleDelivery"
-        @addFailedProduction="handleAddFailedProduction"
-      />
-    </div>
+      <div v-else class="jobs-grid">
+        <JobCard
+          v-for="job in filteredActiveJobs"
+          :key="job.id"
+          :job="job"
+          :is-busy="isJobBusy(job.id)"
+          :is-notes-saving="notesPendingIds.has(job.id)"
+          :is-production-submitting="productionPendingIds.has(job.id)"
+          :is-delivery-submitting="deliveryPendingIds.has(job.id)"
+          :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
+          @edit="openEditModal"
+          @archive="handleArchive"
+          @delete="handleDelete"
+          @production="handleProduction"
+          @editHistory="handleEditHistory"
+          @deleteHistory="handleDeleteHistory"
+          @updateNotes="handleUpdateNotes"
+          @delivery="handleDelivery"
+          @addFailedProduction="handleAddFailedProduction"
+        />
+      </div>
+    </template>
 
     <JobFormModal
       :show="showModal"
@@ -425,10 +509,12 @@ const archiveConfirmLabel = computed(() =>
     <ConfirmModal
       :show="historyDeleteModal.show"
       :title="t('jobs.history.deleteTitle')"
-      :description="t('jobs.history.deleteMessage', {
-        quantity: historyDeleteModal.delta,
-        jobName: historyDeleteModal.jobName,
-      })"
+      :description="
+        t('jobs.history.deleteMessage', {
+          quantity: historyDeleteModal.delta,
+          jobName: historyDeleteModal.jobName,
+        })
+      "
       :confirm-label="t('jobs.history.delete')"
       confirm-variant="danger"
       :confirming="historyDeleteSubmitting"
@@ -439,6 +525,7 @@ const archiveConfirmLabel = computed(() =>
 </template>
 
 <style scoped>
+/* ── Active jobs area ── */
 .dashboard {
   display: flex;
   flex-direction: column;
@@ -455,10 +542,159 @@ const archiveConfirmLabel = computed(() =>
   color: #dc2626;
 }
 
+.state-compact {
+  padding: 16px 12px;
+  font-size: 13px;
+}
+
 .jobs-grid {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
-</style>
 
+/* ── Fixed drawer ── */
+.completed-column {
+  position: fixed;
+  left: 0;
+  top: 56px;
+  bottom: 48px;
+  z-index: 50;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  pointer-events: none; /* let clicks through the transparent toggle area */
+}
+
+/* Panel */
+.drawer-panel {
+  width: 300px;
+  height: 100%;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  box-shadow: 4px 0 28px rgba(15, 23, 42, 0.13);
+  display: flex;
+  flex-direction: column;
+  pointer-events: all;
+  overflow: hidden;
+}
+
+.column-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.column-heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+}
+
+.btn-archived-toggle {
+  flex-shrink: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.btn-archived-toggle:hover,
+.btn-archived-toggle.is-active {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.completed-column-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 10px 24px;
+}
+
+/* Handle tab that sticks out to the right */
+.column-toggle-btn {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 20px;
+  width: 22px;
+  height: 52px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 4px 0 10px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: #6b7280;
+  pointer-events: all;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.column-toggle-btn:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.column-toggle-icon {
+  display: block;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* ── Responsive: mobile ── */
+@media (max-width: 768px) {
+  .completed-column {
+    top: auto;
+    bottom: 48px;
+    left: 0;
+    right: 0;
+    height: auto;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+
+  .drawer-panel {
+    width: 100%;
+    max-height: 50vh;
+    border-right: none;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.1);
+  }
+
+  .column-toggle-btn {
+    align-self: auto;
+    margin-top: 0;
+    width: 52px;
+    height: 22px;
+    border: 1px solid #e5e7eb;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -2px 6px rgba(15, 23, 42, 0.06);
+  }
+}
+</style>

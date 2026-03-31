@@ -19,7 +19,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-const { searchTerm, statusFilter, showArchived } = storeToRefs(jobsStore)
+const { searchTerm, statusFilter } = storeToRefs(jobsStore)
 
 const menuOpen = ref(false)
 const menuAnchorRef = ref<HTMLElement | null>(null)
@@ -41,9 +41,6 @@ const pageTitle = computed(() => {
 })
 const footerPushMode = computed(() => (isClientRoute.value ? 'client' : 'auth'))
 
-const archivedToggleLabel = computed(() =>
-  showArchived.value ? t('jobs.filter.hideArchived') : t('jobs.filter.showArchived'),
-)
 
 // Provide ref for openCreateModal function (to be set by DashboardView)
 const openCreateModalRef = ref<(() => void) | null>(null)
@@ -75,10 +72,6 @@ function toggleMenu() {
   menuOpen.value = !menuOpen.value
 }
 
-function handleArchivedToggle() {
-  jobsStore.toggleArchivedVisibility()
-  menuOpen.value = false
-}
 
 function onClickOutsideMenu(event: MouseEvent) {
   const target = event.target as Node
@@ -154,15 +147,6 @@ watch(
               @click="navigateTo('clients')"
             >
               {{ t('navigation.clients') }}
-            </button>
-            <button
-              v-if="isDashboard"
-              class="menu-item"
-              type="button"
-              role="menuitem"
-              @click="handleArchivedToggle"
-            >
-              {{ archivedToggleLabel }}
             </button>
             <button
               v-if="isDashboard"

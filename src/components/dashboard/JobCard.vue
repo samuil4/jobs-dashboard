@@ -11,6 +11,7 @@ const router = useRouter()
 
 const props = defineProps<{
   job: JobWithHistory
+  variant?: 'default' | 'completed'
   isBusy?: boolean
   isNotesSaving?: boolean
   isProductionSubmitting?: boolean
@@ -217,7 +218,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <article class="job-card card">
+  <article class="job-card card" :class="{ 'is-compact': variant === 'completed' }">
     <header class="job-header">
       <div>
         <h2>{{ job.name }}</h2>
@@ -370,7 +371,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="notes-section">
+      <div v-if="variant === 'completed' && job.notes" class="notes-section">
+        <span class="notes-label">{{ t('jobs.notes') }}</span>
+        <p class="notes-text">{{ job.notes }}</p>
+      </div>
+
+      <div v-if="variant !== 'completed'" class="notes-section">
         <label :for="`notes-${job.id}`" class="notes-label">{{ t('jobs.notes') }}</label>
         <textarea
           :id="`notes-${job.id}`"
@@ -386,7 +392,7 @@ onUnmounted(() => {
         <p v-if="isNotesSaving" class="pending-hint">{{ t('common.saving') }}</p>
       </div>
 
-      <form class="production-form" @submit.prevent="handleProductionSubmit">
+      <form v-if="variant !== 'completed'" class="production-form" @submit.prevent="handleProductionSubmit">
         <div class="production-form-row">
           <input
             :id="`production-${job.id}`"
@@ -410,7 +416,7 @@ onUnmounted(() => {
         <p v-if="productionError" class="error">{{ productionError }}</p>
       </form>
 
-      <form class="delivery-form" @submit.prevent="handleDeliverySubmit">
+      <form v-if="variant !== 'completed'" class="delivery-form" @submit.prevent="handleDeliverySubmit">
         <div class="production-form-row">
           <input
             :id="`delivery-${job.id}`"
@@ -436,7 +442,42 @@ onUnmounted(() => {
     </section>
 
     <footer class="job-footer">
-      <div class="history">
+      <details v-if="variant === 'completed'" class="history history-collapsible">
+        <summary class="history-toggle">
+          {{ t('jobs.history.title') }}
+          <span class="history-count">({{ job.job_updates.length }})</span>
+        </summary>
+        <div v-if="job.job_updates.length === 0" class="history-empty">
+          {{ t('jobs.history.empty') }}
+        </div>
+        <ul v-else>
+          <li v-for="update in job.job_updates" :key="update.id" class="history-item">
+            <span class="history-entry">{{ formatHistoryEntry(update.delta, update.created_at, update.update_type) }}</span>
+            <div class="history-actions">
+              <button
+                class="btn-icon"
+                type="button"
+                :title="t('jobs.history.edit')"
+                :disabled="isBusy"
+                @click="emit('editHistory', job.id, update.id, update.delta, update.update_type)"
+              >
+                {{ t('jobs.history.edit') }}
+              </button>
+              <button
+                class="btn-icon btn-icon-danger"
+                type="button"
+                :title="t('jobs.history.delete')"
+                :disabled="isBusy"
+                @click="emit('deleteHistory', job.id, update.id)"
+              >
+                {{ t('jobs.history.delete') }}
+              </button>
+            </div>
+          </li>
+        </ul>
+      </details>
+
+      <div v-else class="history">
         <h3>{{ t('jobs.history.title') }}</h3>
         <div v-if="job.job_updates.length === 0" class="history-empty">
           {{ t('jobs.history.empty') }}
@@ -903,6 +944,82 @@ onUnmounted(() => {
   background: #f3f4f6;
   padding: 12px;
   border-radius: 12px;
+}
+
+.history-collapsible {
+  border: none;
+  padding: 0;
+}
+
+.history-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  padding: 6px 0;
+  user-select: none;
+  list-style: none;
+}
+
+.history-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.history-toggle::before {
+  content: '▶';
+  font-size: 10px;
+  color: #9ca3af;
+  transition: transform 0.18s;
+  display: inline-block;
+}
+
+details[open] .history-toggle::before {
+  transform: rotate(90deg);
+}
+
+.history-count {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.history-collapsible ul {
+  margin-top: 6px;
+}
+
+.notes-text {
+  margin: 0;
+  font-size: 13px;
+  color: #374151;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.is-compact {
+  gap: 12px;
+  padding: 16px;
+}
+
+.is-compact .job-header h2 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.is-compact .stats {
+  gap: 10px 16px;
+  margin-bottom: 10px;
+  padding: 8px 0;
+}
+
+.is-compact .stat-item .label {
+  font-size: 12px;
+}
+
+.is-compact .stat-item strong {
+  font-size: 14px;
 }
 
 .job-footer {

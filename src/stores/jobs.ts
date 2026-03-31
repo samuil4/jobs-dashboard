@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import bcrypt from 'bcryptjs'
 import { formatISO } from 'date-fns'
 
@@ -31,10 +31,19 @@ type NormalizedSelectedJobRow = JobRecord & {
 export const useJobsStore = defineStore('jobs', () => {
   const jobs = ref<JobWithHistory[]>([])
   const loading = ref(false)
+  /** Coordinates concurrent `fetchJobs` so `loading` clears when the last call finishes. */
+  let fetchJobsInFlight = 0
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const statusFilter = ref<StatusFilter>('all')
-  const showArchived = ref(false)
+  const LS_SHOW_ARCHIVED_KEY = 'jobs:showArchived'
+  const showArchived = ref(
+    typeof localStorage !== 'undefined' && localStorage.getItem(LS_SHOW_ARCHIVED_KEY) === 'true',
+  )
+
+  watch(showArchived, (val) => {
+    localStorage.setItem(LS_SHOW_ARCHIVED_KEY, String(val))
+  })
 
   function withHistory(job: JobRecord, history: JobUpdateRecord[] | null): JobWithHistory {
     return {
@@ -54,26 +63,34 @@ export const useJobsStore = defineStore('jobs', () => {
   }
 
   async function fetchJobs() {
+    fetchJobsInFlight += 1
     loading.value = true
     error.value = null
-    const { data, error: fetchError } = await supabase
-      .from('jobs')
-      .select(JOB_SELECT_FIELDS)
-      .order('created_at', { ascending: false })
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('jobs')
+        .select(JOB_SELECT_FIELDS)
+        .order('created_at', { ascending: false })
 
-    if (fetchError) {
-      error.value = fetchError.message
-      loading.value = false
-      return
+      if (fetchError) {
+        error.value = fetchError.message
+        return
+      }
+
+      jobs.value =
+        data?.map((item) => {
+          const { job_updates, ...rest } = parseSelectedJobRow(item)
+          return withHistory(rest, job_updates)
+        }) ?? []
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      fetchJobsInFlight -= 1
+      if (fetchJobsInFlight <= 0) {
+        fetchJobsInFlight = 0
+        loading.value = false
+      }
     }
-
-    jobs.value =
-      data?.map((item) => {
-        const { job_updates, ...rest } = parseSelectedJobRow(item)
-        return withHistory(rest, job_updates)
-      }) ?? []
-
-    loading.value = false
   }
 
   async function createJob(payload: NewJobPayload) {
@@ -182,7 +199,9 @@ export const useJobsStore = defineStore('jobs', () => {
   async function archiveJob(id: string, archivedValue: boolean) {
     error.value = null
     const job = jobs.value.find((j) => j.id === id)
-    if (!job) return
+    if (!job) {
+      throw new Error('Job not found in the current list. Try refreshing the page.')
+    }
 
     const status = archivedValue
       ? ('archived' as const)
@@ -191,18 +210,23 @@ export const useJobsStore = defineStore('jobs', () => {
         : ('active' as const)
     const updatedAt = formatISO(new Date())
 
-    const { error: updateError } = await supabase
-      .from('jobs')
-      .update({
-        archived: archivedValue,
-        status,
-        updated_at: updatedAt,
-      })
-      .eq('id', id)
+    try {
+      const { error: updateError } = await supabase
+        .from('jobs')
+        .update({
+          archived: archivedValue,
+          status,
+          updated_at: updatedAt,
+        })
+        .eq('id', id)
 
-    if (updateError) {
-      error.value = updateError.message
-      throw updateError
+      if (updateError) {
+        error.value = updateError.message
+        throw updateError
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to archive job'
+      throw e
     }
 
     jobs.value = jobs.value.map((item) =>
@@ -281,24 +305,47 @@ export const useJobsStore = defineStore('jobs', () => {
     })
   }
 
+  function matchesSearch(job: JobWithHistory, query: string): boolean {
+    if (!query) return true
+    return (
+      job.name.toLowerCase().includes(query) ||
+      job.assignee.toLowerCase().includes(query) ||
+      (job.client?.company_name?.toLowerCase().includes(query) ?? false) ||
+      (job.client?.username?.toLowerCase().includes(query) ?? false)
+    )
+  }
+
   const filteredJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
     return jobs.value.filter((job) => {
       if (!showArchived.value && job.archived && statusFilter.value !== 'archived') {
         return false
       }
-
       if (statusFilter.value !== 'all' && job.status !== statusFilter.value) {
         return false
       }
+      return matchesSearch(job, query)
+    })
+  })
 
-      if (!query) return true
-      return (
-        job.name.toLowerCase().includes(query) ||
-        job.assignee.toLowerCase().includes(query) ||
-        job.client?.company_name?.toLowerCase().includes(query) ||
-        job.client?.username?.toLowerCase().includes(query)
-      )
+  const filteredActiveJobs = computed(() => {
+    const query = searchTerm.value.trim().toLowerCase()
+    if (statusFilter.value !== 'all' && statusFilter.value !== 'active') return []
+    return jobs.value.filter((job) => {
+      if (job.status !== 'active') return false
+      return matchesSearch(job, query)
+    })
+  })
+
+  const filteredCompletedJobs = computed(() => {
+    const query = searchTerm.value.trim().toLowerCase()
+    if (statusFilter.value !== 'all' && statusFilter.value !== 'completed' && statusFilter.value !== 'archived') {
+      return []
+    }
+    return jobs.value.filter((job) => {
+      if (job.status !== 'completed' && job.status !== 'archived') return false
+      if (statusFilter.value !== 'all' && job.status !== statusFilter.value) return false
+      return matchesSearch(job, query)
     })
   })
 
@@ -794,6 +841,8 @@ export const useJobsStore = defineStore('jobs', () => {
     statusFilter,
     showArchived,
     filteredJobs,
+    filteredActiveJobs,
+    filteredCompletedJobs,
     fetchJobs,
     createJob,
     updateJob,

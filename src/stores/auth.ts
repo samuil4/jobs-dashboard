@@ -2,11 +2,15 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { Session, User } from '@supabase/supabase-js'
 
-import { supabase } from '../lib/supabase'
+import { supabase, SUPABASE_AUTH_STORAGE_KEY } from '../lib/supabase'
 import type { ClientRecord } from '../types/client'
 
 const AUTH_EMAIL_DOMAIN = import.meta.env.VITE_SUPABASE_AUTH_EMAIL_DOMAIN ?? 'example.com'
 const CLIENT_EMAIL_DOMAIN = 'clients.jobs-dashboard.local'
+
+/** Avoid stacking duplicate `onAuthStateChange` listeners if `init()` runs more than once. */
+let authStateListenerRegistered = false
+
 type UserRole = 'staff' | 'client' | null
 type ClientProfile = Pick<ClientRecord, 'id' | 'username' | 'company_name'>
 
@@ -54,19 +58,34 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = initialSession?.user ?? null
     try {
       await resolveAccessProfile(initialSession?.user?.id ?? null)
+    } catch (err) {
+      console.error('Failed to resolve access profile during init', err)
     } finally {
       loading.value = false
     }
 
-    supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      try {
-        session.value = newSession ?? null
-        user.value = newSession?.user ?? null
-        await resolveAccessProfile(newSession?.user?.id ?? null)
-      } catch (err) {
-        console.error('Failed to resolve access profile after auth state change', err)
-      }
-    })
+    if (!authStateListenerRegistered) {
+      authStateListenerRegistered = true
+      supabase.auth.onAuthStateChange(async (_event, newSession) => {
+        try {
+          session.value = newSession ?? null
+          user.value = newSession?.user ?? null
+          // IMPORTANT: do not await Supabase queries here.
+          // Auth-js may invoke this callback while holding its internal session lock
+          // (e.g. during recover/refresh). Awaiting DB calls here can deadlock
+          // because those calls need to read the session too.
+          void Promise.resolve().then(async () => {
+            try {
+              await resolveAccessProfile(newSession?.user?.id ?? null)
+            } catch (err) {
+              console.error('Failed to resolve access profile after auth state change', err)
+            }
+          })
+        } catch (err) {
+          console.error('Failed to resolve access profile after auth state change', err)
+        }
+      })
+    }
   }
 
   function resolveEmail(username: string, mode: 'staff' | 'client' = 'staff') {
@@ -104,6 +123,30 @@ export const useAuthStore = defineStore('auth', () => {
     clientProfile.value = null
   }
 
+  async function rehydrateFromStorage(): Promise<boolean> {
+    try {
+      const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY)
+      if (!raw) return false
+
+      const stored: { access_token?: string; refresh_token?: string } = JSON.parse(raw)
+      if (!stored.access_token || !stored.refresh_token) return false
+
+      const { data, error: setError } = await supabase.auth.setSession({
+        access_token: stored.access_token,
+        refresh_token: stored.refresh_token,
+      })
+
+      if (setError || !data.session) return false
+
+      session.value = data.session
+      user.value = data.session.user
+      await resolveAccessProfile(data.session.user?.id ?? null)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const isAuthenticated = computed(() => Boolean(session.value))
   const userEmail = computed(() => user.value?.email ?? null)
   const userId = computed(() => user.value?.id ?? null)
@@ -132,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signOut,
     resolveAccessProfile,
+    rehydrateFromStorage,
   }
 })
 
