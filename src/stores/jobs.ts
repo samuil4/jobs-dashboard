@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import bcrypt from 'bcryptjs'
 import { formatISO } from 'date-fns'
 
@@ -36,7 +36,14 @@ export const useJobsStore = defineStore('jobs', () => {
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const statusFilter = ref<StatusFilter>('all')
-  const showArchived = ref(false)
+  const LS_SHOW_ARCHIVED_KEY = 'jobs:showArchived'
+  const showArchived = ref(
+    typeof localStorage !== 'undefined' && localStorage.getItem(LS_SHOW_ARCHIVED_KEY) === 'true',
+  )
+
+  watch(showArchived, (val) => {
+    localStorage.setItem(LS_SHOW_ARCHIVED_KEY, String(val))
+  })
 
   function withHistory(job: JobRecord, history: JobUpdateRecord[] | null): JobWithHistory {
     return {
@@ -203,18 +210,23 @@ export const useJobsStore = defineStore('jobs', () => {
         : ('active' as const)
     const updatedAt = formatISO(new Date())
 
-    const { error: updateError } = await supabase
-      .from('jobs')
-      .update({
-        archived: archivedValue,
-        status,
-        updated_at: updatedAt,
-      })
-      .eq('id', id)
+    try {
+      const { error: updateError } = await supabase
+        .from('jobs')
+        .update({
+          archived: archivedValue,
+          status,
+          updated_at: updatedAt,
+        })
+        .eq('id', id)
 
-    if (updateError) {
-      error.value = updateError.message
-      throw updateError
+      if (updateError) {
+        error.value = updateError.message
+        throw updateError
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to archive job'
+      throw e
     }
 
     jobs.value = jobs.value.map((item) =>

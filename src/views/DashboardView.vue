@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, reactive, ref, type Ref } from 'vue'
+import { computed, inject, onMounted, reactive, ref, watch, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
@@ -19,8 +19,16 @@ const { t } = useI18n()
 
 const { filteredActiveJobs, filteredCompletedJobs, loading, error } = storeToRefs(jobsStore)
 
+const LS_HIDE_ARCHIVED_KEY = 'dashboard:hideArchivedInColumn'
+
 const completedColumnCollapsed = ref(false)
-const hideArchivedInColumn = ref(false)
+const hideArchivedInColumn = ref(
+  localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
+)
+
+watch(hideArchivedInColumn, (val) => {
+  localStorage.setItem(LS_HIDE_ARCHIVED_KEY, String(val))
+})
 
 function toggleCompletedColumn() {
   completedColumnCollapsed.value = !completedColumnCollapsed.value
@@ -181,7 +189,6 @@ function closeArchiveModal() {
 }
 
 async function confirmArchive() {
-  debugger
   if (!archiveModal.jobId || archiveSubmitting.value) return
   const shouldArchive = archiveModal.action === 'archive'
   archiveSubmitting.value = true
