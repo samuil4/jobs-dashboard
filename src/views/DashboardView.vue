@@ -23,10 +23,11 @@ const LS_HIDE_ARCHIVED_KEY = 'dashboard:hideArchivedInColumn'
 
 const completedColumnCollapsed = ref(false)
 const hideArchivedInColumn = ref(
-  localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
+  typeof localStorage !== 'undefined' && localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
 )
 
 watch(hideArchivedInColumn, (val) => {
+  if (typeof localStorage === 'undefined') return
   localStorage.setItem(LS_HIDE_ARCHIVED_KEY, String(val))
 })
 
@@ -392,7 +393,10 @@ const archiveConfirmLabel = computed(() =>
         </div>
 
         <div class="completed-column-body">
-          <div v-if="visibleCompletedJobs.length === 0" class="card state state-compact">
+          <div
+            v-if="!loading && !error && visibleCompletedJobs.length === 0"
+            class="card state state-compact"
+          >
             {{ t('jobs.completedEmpty') }}
           </div>
 

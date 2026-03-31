@@ -147,28 +147,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function withTokenRecovery<T>(fn: () => Promise<T>): Promise<T> {
-    try {
-      return await fn()
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message.toLowerCase() : ''
-      const isInvalidRefreshToken =
-        msg.includes('invalid refresh token') ||
-        msg.includes('refresh_token_not_found') ||
-        (err as { code?: string })?.code === 'invalid_grant'
-
-      if (isInvalidRefreshToken) {
-        const recovered = await rehydrateFromStorage()
-        if (recovered) {
-          return await fn()
-        }
-        await signOut()
-      }
-
-      throw err
-    }
-  }
-
   const isAuthenticated = computed(() => Boolean(session.value))
   const userEmail = computed(() => user.value?.email ?? null)
   const userId = computed(() => user.value?.id ?? null)
@@ -198,7 +176,6 @@ export const useAuthStore = defineStore('auth', () => {
     signOut,
     resolveAccessProfile,
     rehydrateFromStorage,
-    withTokenRecovery,
   }
 })
 
