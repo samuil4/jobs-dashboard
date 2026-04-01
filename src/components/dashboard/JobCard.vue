@@ -27,7 +27,12 @@ const emit = defineEmits<{
   (e: 'editHistory', jobId: string, historyId: string, currentDelta: number, updateType?: UpdateType): void
   (e: 'deleteHistory', jobId: string, historyId: string): void
   (e: 'updateNotes', jobId: string, notes: string | null): void
-  (e: 'delivery', jobId: string, delta: number): void
+  (
+    e: 'delivery',
+    jobId: string,
+    delta: number,
+    callbacks?: { onSuccess: () => void; onError: (message: string) => void },
+  ): void
   (
     e: 'addFailedProduction',
     jobId: string,
@@ -48,6 +53,7 @@ const failedProductionError = ref<string | null>(null)
 const menuOpen = ref(false)
 const menuAnchorRef = ref<HTMLElement | null>(null)
 const failedProductionModalOpen = ref(false)
+const deliveryModalOpen = ref(false)
 
 watch(
   () => props.job.notes,
@@ -64,6 +70,12 @@ const partsRemaining = computed(() =>
 )
 
 const partsOverproduced = computed(() => props.job.parts_overproduced ?? 0)
+
+/** No remaining capacity to record delivery (same rule as handleDeliverySubmit). */
+const canAddMoreDelivery = computed(() => {
+  const delivered = props.job.delivered ?? 0
+  return delivered < totalProduced.value
+})
 
 const statusBadgeClass = computed(() => {
   switch (props.job.status) {
@@ -188,6 +200,38 @@ function closeFailedProductionModal() {
   failedProductionInput.value = null
 }
 
+function openDeliveryModal() {
+  menuOpen.value = false
+  deliveryModalOpen.value = true
+  deliveryError.value = null
+  deliveryInput.value = null
+}
+
+function closeDeliveryModal() {
+  deliveryModalOpen.value = false
+  deliveryError.value = null
+  deliveryInput.value = null
+}
+
+function handleDeliveryModalSubmit() {
+  deliveryError.value = null
+  if (!deliveryInput.value || deliveryInput.value <= 0) {
+    deliveryError.value = t('common.invalidNumber')
+    return
+  }
+  const delivered = props.job.delivered ?? 0
+  if (deliveryInput.value + delivered > totalProduced.value) {
+    deliveryError.value = t('errors.deliveredExceedsProduced')
+    return
+  }
+  emit('delivery', props.job.id, deliveryInput.value, {
+    onSuccess: () => closeDeliveryModal(),
+    onError: (message: string) => {
+      deliveryError.value = message
+    },
+  })
+}
+
 function handleFailedProductionSubmit() {
   failedProductionError.value = null
   if (!failedProductionInput.value || failedProductionInput.value <= 0) {
@@ -306,6 +350,22 @@ onUnmounted(() => {
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
               </svg>
               {{ shareLinkCopied ? t('jobs.shareLinkCopied') : t('jobs.copyShareLink') }}
+            </button>
+            <button
+              v-if="variant === 'completed' && canAddMoreDelivery"
+              type="button"
+              role="menuitem"
+              class="menu-item"
+              :disabled="isBusy"
+              @click="openDeliveryModal"
+            >
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M16.5 9.4l-9-5.19" />
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+              {{ t('jobs.addDelivery') }}
             </button>
             <button
               type="button"
@@ -546,6 +606,46 @@ onUnmounted(() => {
             </button>
           </div>
           <p v-if="failedProductionError" class="error">{{ failedProductionError }}</p>
+        </form>
+      </div>
+    </div>
+
+    <div v-if="deliveryModalOpen" class="overlay" role="dialog" aria-modal="true" :aria-labelledby="`delivery-modal-title-${job.id}`">
+      <div class="modal failed-production-modal">
+        <header class="modal-header">
+          <h2 :id="`delivery-modal-title-${job.id}`">{{ t('jobs.deliveryModalTitle') }}</h2>
+          <button
+            class="btn btn-ghost"
+            type="button"
+            :aria-label="t('common.close')"
+            :disabled="isDeliverySubmitting"
+            @click="closeDeliveryModal"
+          >
+            {{ t('common.close') }}
+          </button>
+        </header>
+        <form class="modal-form" @submit.prevent="handleDeliveryModalSubmit">
+          <div class="production-form-row">
+            <input
+              :id="`delivery-modal-${job.id}`"
+              v-model.number="deliveryInput"
+              type="number"
+              min="1"
+              :placeholder="t('jobs.addDelivery')"
+              :aria-label="t('jobs.addDelivery')"
+              class="production-input"
+              :disabled="isDeliverySubmitting"
+            />
+            <button
+              class="btn btn-primary"
+              :class="{ 'is-loading': isDeliverySubmitting }"
+              type="submit"
+              :disabled="isDeliverySubmitting"
+            >
+              {{ isDeliverySubmitting ? t('common.saving') : t('jobs.addDelivery') }}
+            </button>
+          </div>
+          <p v-if="deliveryError" class="error">{{ deliveryError }}</p>
         </form>
       </div>
     </div>

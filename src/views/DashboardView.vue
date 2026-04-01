@@ -254,13 +254,23 @@ async function handleUpdateNotes(jobId: string, notes: string | null) {
   })
 }
 
-async function handleDelivery(jobId: string, delta: number) {
+async function handleDelivery(
+  jobId: string,
+  delta: number,
+  callbacks?: { onSuccess: () => void; onError: (message: string) => void },
+) {
   await withPending(deliveryPendingIds, jobId, async () => {
     try {
       await jobsStore.addDelivery(jobId, delta, authStore.userId)
+      callbacks?.onSuccess?.()
     } catch (err) {
       console.error(err)
-      alert(t('errors.updateProduction'))
+      const message = err instanceof Error ? err.message : t('errors.addDelivery')
+      if (callbacks?.onError) {
+        callbacks.onError(message)
+      } else {
+        alert(t('errors.updateProduction'))
+      }
     }
   })
 }
@@ -407,12 +417,14 @@ const archiveConfirmLabel = computed(() =>
             :job="job"
             :is-busy="isJobBusy(job.id)"
             :is-notes-saving="notesPendingIds.has(job.id)"
+            :is-delivery-submitting="deliveryPendingIds.has(job.id)"
             :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
             @edit="openEditModal"
             @archive="handleArchive"
             @delete="handleDelete"
             @editHistory="handleEditHistory"
             @deleteHistory="handleDeleteHistory"
+            @delivery="handleDelivery"
             @addFailedProduction="handleAddFailedProduction"
           />
         </div>
