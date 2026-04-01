@@ -60,7 +60,7 @@ watch(
   clientGroupDetailsOpen,
   () => {
     if (typeof localStorage === 'undefined') return
-    localStorage.setItem(LS_CLIENT_GROUP_DETAILS_OPEN, JSON.stringify(clientGroupDetailsOpen.value))
+    try { localStorage.setItem(LS_CLIENT_GROUP_DETAILS_OPEN, JSON.stringify(clientGroupDetailsOpen.value)) } catch { /* storage unavailable */ }
   },
   { deep: true },
 )
@@ -83,7 +83,7 @@ const expandedCompletedGroupKey = ref<string | null>(loadExpandedCompletedGroupK
 
 watch(expandedCompletedGroupKey, (k) => {
   if (typeof localStorage === 'undefined') return
-  localStorage.setItem(LS_EXPANDED_COMPLETED_CLIENT_GROUP, JSON.stringify(k))
+  try { localStorage.setItem(LS_EXPANDED_COMPLETED_CLIENT_GROUP, JSON.stringify(k)) } catch { /* storage unavailable */ }
 })
 
 function detailsSectionOpenActive(key: string): boolean {
@@ -133,7 +133,7 @@ watch(
   clientGroupOrder,
   (v) => {
     if (typeof localStorage === 'undefined') return
-    localStorage.setItem(LS_CLIENT_GROUP_ORDER, JSON.stringify(v))
+    try { localStorage.setItem(LS_CLIENT_GROUP_ORDER, JSON.stringify(v)) } catch { /* storage unavailable */ }
   },
   { deep: true },
 )
@@ -157,7 +157,7 @@ const completedColumnCollapsed = ref(
 
 watch(completedColumnCollapsed, (collapsed) => {
   if (typeof localStorage === 'undefined') return
-  localStorage.setItem(LS_COMPLETED_COLUMN_COLLAPSED, String(collapsed))
+  try { localStorage.setItem(LS_COMPLETED_COLUMN_COLLAPSED, String(collapsed)) } catch { /* storage unavailable */ }
 })
 const hideArchivedInColumn = ref(
   typeof localStorage !== 'undefined' && localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
@@ -165,7 +165,7 @@ const hideArchivedInColumn = ref(
 
 watch(hideArchivedInColumn, (val) => {
   if (typeof localStorage === 'undefined') return
-  localStorage.setItem(LS_HIDE_ARCHIVED_KEY, String(val))
+  try { localStorage.setItem(LS_HIDE_ARCHIVED_KEY, String(val)) } catch { /* storage unavailable */ }
 })
 
 function toggleCompletedColumn() {
