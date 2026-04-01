@@ -281,13 +281,6 @@ onUnmounted(() => {
     <header class="job-header">
       <div class="job-header-title-row">
         <h2>{{ job.name }}</h2>
-      </div>
-      <div class="job-header-meta-row">
-        <span class="assignee">{{ t('jobs.assignee') }}: {{ job.assignee }}</span>
-        <span v-if="job.client" class="assignee">{{ t('jobs.client') }}: {{ job.client.company_name }}</span>
-        <span :class="statusBadgeClass">{{ t(`jobs.status.${job.status}`) }}</span>
-        <span :class="priorityBadgeClass">{{ t(`jobs.priority.${effectivePriority}`) }}</span>
-        <span class="date">{{ t('jobs.dateAdded') }}: {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span>
         <div ref="menuAnchorRef" class="menu-wrapper">
           <button
             type="button"
@@ -410,6 +403,13 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
+      </div>
+      <div class="job-header-meta-row">
+        <span class="assignee">{{ t('jobs.assignee') }}: {{ job.assignee }}</span>
+        <span v-if="job.client" class="assignee">{{ t('jobs.client') }}: {{ job.client.company_name }}</span>
+        <span :class="statusBadgeClass">{{ t(`jobs.status.${job.status}`) }}</span>
+        <span :class="priorityBadgeClass">{{ t(`jobs.priority.${effectivePriority}`) }}</span>
+        <span class="date">{{ t('jobs.dateAdded') }}: {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span>
       </div>
     </header>
 
@@ -672,6 +672,13 @@ onUnmounted(() => {
 .job-header {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.job-header-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
 }
 

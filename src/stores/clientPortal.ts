@@ -149,8 +149,8 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     const mul = sortDir.value === 'asc' ? 1 : -1
     list.sort((a, b) => {
       if (sortBy.value === 'updated_at') {
-        const ta = new Date(a.updated_at).getTime()
-        const tb = new Date(b.updated_at).getTime()
+        const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
+        const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
         return mul * (ta - tb)
       }
       return mul * (statusSortRank(a.status) - statusSortRank(b.status))

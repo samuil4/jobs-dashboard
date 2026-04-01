@@ -56,10 +56,14 @@ function loadClientGroupDetailsOpen(): ClientGroupDetailsOpenState {
 
 const clientGroupDetailsOpen = ref<ClientGroupDetailsOpenState>(loadClientGroupDetailsOpen())
 
-watch(clientGroupDetailsOpen, () => {
-  if (typeof localStorage === 'undefined') return
-  localStorage.setItem(LS_CLIENT_GROUP_DETAILS_OPEN, JSON.stringify(clientGroupDetailsOpen.value))
-}, { deep: true })
+watch(
+  clientGroupDetailsOpen,
+  () => {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(LS_CLIENT_GROUP_DETAILS_OPEN, JSON.stringify(clientGroupDetailsOpen.value))
+  },
+  { deep: true },
+)
 
 function loadExpandedCompletedGroupKey(): string | null {
   if (typeof localStorage === 'undefined') return null
@@ -182,19 +186,12 @@ const orderedCompletedGroups = computed(() => {
 
 watch(orderedCompletedGroups, (groups) => {
   const keys = new Set(groups.map((g) => g.key))
-  if (
-    expandedCompletedGroupKey.value !== null &&
-    !keys.has(expandedCompletedGroupKey.value)
-  ) {
+  if (expandedCompletedGroupKey.value !== null && !keys.has(expandedCompletedGroupKey.value)) {
     expandedCompletedGroupKey.value = null
   }
 })
 
-function moveClientSection(
-  column: 'active' | 'completed',
-  key: string,
-  direction: 'up' | 'down',
-) {
+function moveClientSection(column: 'active' | 'completed', key: string, direction: 'up' | 'down') {
   const list = column === 'active' ? filteredActiveJobs.value : visibleCompletedJobs.value
   const columnMap = groupJobsByClient(list, resolveClientLabel)
   const visibleKeys = mergeOrder(clientGroupOrder.value, columnMap)
@@ -440,7 +437,7 @@ async function handleDelivery(
       if (callbacks?.onError) {
         callbacks.onError(message)
       } else {
-        alert(t('errors.updateProduction'))
+        alert(message)
       }
     }
   })
