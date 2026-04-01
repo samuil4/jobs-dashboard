@@ -10,7 +10,7 @@ import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useClientsStore } from '../stores/clients'
 import { useJobsStore } from '../stores/jobs'
-import type { Assignee, JobWithHistory, UpdateType } from '../types/job'
+import type { Assignee, JobPriority, JobWithHistory, UpdateType } from '../types/job'
 import {
   UNASSIGNED_KEY,
   groupJobsByClient,
@@ -254,6 +254,7 @@ const modalInitialValues = computed(() => {
     name: job.name,
     partsNeeded: job.parts_needed,
     assignee: job.assignee as Assignee,
+    priority: job.priority,
     clientId: job.client_id,
     hasSharePassword: Boolean(job.has_share_password),
   }
@@ -305,6 +306,7 @@ async function handleModalSubmit(payload: {
   name: string
   partsNeeded: number
   assignee: Assignee
+  priority: JobPriority
   clientId?: string | null
   sharePassword?: string | null
 }) {
@@ -319,12 +321,14 @@ async function handleModalSubmit(payload: {
         name: string
         partsNeeded: number
         assignee: Assignee
+        priority: JobPriority
         clientId?: string | null
         sharePassword?: string | null
       } = {
         name: payload.name,
         partsNeeded: payload.partsNeeded,
         assignee: payload.assignee,
+        priority: payload.priority,
         clientId: payload.clientId ?? null,
       }
       if (payload.sharePassword != null && payload.sharePassword.trim() !== '') {

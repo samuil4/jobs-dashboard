@@ -2,6 +2,8 @@ export type Assignee = 'Samuil' | 'Oleksii' | 'Veselin'
 
 export type JobStatus = 'active' | 'completed' | 'archived'
 
+export type JobPriority = 'low' | 'normal' | 'high' | 'urgent'
+
 export interface JobRecord {
   id: string
   name: string
@@ -13,6 +15,7 @@ export interface JobRecord {
   parts_failed: number
   archived: boolean
   status: JobStatus
+  priority: JobPriority
   assignee: Assignee
   created_at: string
   updated_at: string
@@ -45,6 +48,7 @@ export interface NewJobPayload {
   name: string
   partsNeeded: number
   assignee: Assignee
+  priority: JobPriority
   clientId?: string | null
   sharePassword?: string | null
 }
@@ -53,6 +57,7 @@ export interface UpdateJobPayload {
   name: string
   partsNeeded: number
   assignee: Assignee
+  priority: JobPriority
   clientId?: string | null
   sharePassword?: string | null
 }

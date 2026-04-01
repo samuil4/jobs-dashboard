@@ -137,6 +137,13 @@ export default {
       completed: 'Завършено',
       archived: 'Архивирано',
     },
+    priority: {
+      label: 'Приоритет',
+      low: 'Нисък',
+      normal: 'Нормален',
+      high: 'Висок',
+      urgent: 'Спешен',
+    },
     empty: 'Няма задания. Създайте ново, за да започнете.',
     archive: 'Архивирай',
     unarchive: 'Възстанови',

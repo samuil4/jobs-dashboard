@@ -4,7 +4,7 @@ Manufacturing jobs dashboard built with Vue 3 + Vite. Tracks production targets,
 
 ## Features
 
-- Create, edit and archive jobs with name, target quantity, produced quantity and assignee (`Samuil`, `Oleksii`, `Veselin`).
+- Create, edit and archive jobs with name, target quantity, produced quantity, assignee (`Samuil`, `Oleksii`, `Veselin`), and priority (`Low`, `Normal`, `High`, `Urgent`) with color-coded badges.
 - Assign each job to a client, or leave it unassigned.
 - Manage clients from a dedicated staff page with add, edit, delete, and calculated workload totals.
 - Client portal with separate login, client-only routing, and client-only job visibility.
@@ -271,6 +271,20 @@ This migration adds:
 - client-only access to assigned jobs and job history
 - `client_push_subscriptions` for client portal notifications
 
+2.7. Add job priority support by running `supabase/migrations/0009_job_priority.sql`:
+
+```sql
+ALTER TABLE public.jobs
+ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal';
+
+ALTER TABLE public.jobs
+ADD CONSTRAINT jobs_priority_check CHECK (priority IN ('low', 'normal', 'high', 'urgent'));
+
+COMMENT ON COLUMN public.jobs.priority IS 'Job priority level: low, normal, high, or urgent.';
+```
+
+Existing jobs default to `normal`. The priority badge is displayed next to the status badge on each job card and in the client portal.
+
 3. Create at least one Supabase auth user for staff. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` becomes Supabase email `operator@example.com`.
 
 4. Deploy the staff-only Edge Function used by the clients page to create, update, and delete client auth users:
@@ -352,21 +366,24 @@ npm run dev
 If the code is already pulled locally, the remaining setup to make the new client functionality work in a real environment is:
 
 1. Apply `supabase/migrations/0007_clients_and_client_access.sql`.
-2. Deploy `manage-client-users`.
-3. Redeploy `send-manufacturing-push` so it includes client portal subscriptions.
-4. Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the deployed Edge Functions.
-5. Create at least one staff account in Supabase Auth.
-6. Sign in as staff and create client accounts from the new clients page instead of creating them manually in the Supabase Auth dashboard.
+2. Apply `supabase/migrations/0009_job_priority.sql` to add the priority column.
+3. Deploy `manage-client-users`.
+4. Redeploy `send-manufacturing-push` so it includes client portal subscriptions.
+5. Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the deployed Edge Functions.
+6. Create at least one staff account in Supabase Auth.
+7. Sign in as staff and create client accounts from the new clients page instead of creating them manually in the Supabase Auth dashboard.
 
 Recommended manual verification after setup:
 
 1. Staff can open the dashboard and clients pages.
 2. Staff can create, edit, and delete clients.
 3. Staff can assign a client to a job.
-4. Client can sign in at `/client/login`.
-5. Client can only access `/client/jobs` and is redirected away from staff routes.
-6. Client only sees jobs assigned to that client.
-7. Archived client jobs stay hidden until explicitly requested.
+4. Staff can set and change job priority (low, normal, high, urgent) when creating or editing a job.
+5. Priority badges display with correct colors next to the status badge on job cards and in the client portal.
+6. Client can sign in at `/client/login`.
+7. Client can only access `/client/jobs` and is redirected away from staff routes.
+8. Client only sees jobs assigned to that client.
+9. Archived client jobs stay hidden until explicitly requested.
 
 ### Build for Production
 

@@ -145,6 +145,11 @@ button {
   color: #1d4ed8;
 }
 
+.badge-danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
 input,
 select {
   width: 100%;

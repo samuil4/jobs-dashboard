@@ -156,6 +156,16 @@ onUnmounted(() => {
                 >
                   {{ t(`jobs.status.${job.status}`) }}
                 </span>
+                <span
+                  class="badge"
+                  :class="{
+                    'badge-info': (job.priority ?? 'normal') === 'normal',
+                    'badge-warning': job.priority === 'high',
+                    'badge-danger': job.priority === 'urgent',
+                  }"
+                >
+                  {{ t(`jobs.priority.${job.priority ?? 'normal'}`) }}
+                </span>
               </td>
               <td>{{ job.parts_needed }}</td>
               <td>{{ totalProduced(job) }}</td>

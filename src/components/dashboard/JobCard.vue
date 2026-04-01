@@ -88,6 +88,21 @@ const statusBadgeClass = computed(() => {
   }
 })
 
+const effectivePriority = computed(() => props.job.priority ?? 'normal')
+
+const priorityBadgeClass = computed(() => {
+  switch (effectivePriority.value) {
+    case 'low':
+      return 'badge'
+    case 'high':
+      return 'badge badge-warning'
+    case 'urgent':
+      return 'badge badge-danger'
+    default:
+      return 'badge badge-info'
+  }
+})
+
 async function handleProductionSubmit() {
   productionError.value = null
   if (!productionInput.value || productionInput.value <= 0) {
@@ -264,20 +279,16 @@ onUnmounted(() => {
 <template>
   <article class="job-card card" :class="{ 'is-compact': variant === 'completed' }">
     <header class="job-header">
-      <div>
+      <div class="job-header-title-row">
         <h2>{{ job.name }}</h2>
-        <p class="assignee">
-          {{ t('jobs.assignee') }}: {{ job.assignee }}
-        </p>
-        <p v-if="job.client" class="assignee">
-          {{ t('jobs.client') }}: {{ job.client.company_name }}
-        </p>
       </div>
-      <div ref="menuAnchorRef" class="status status-with-menu">
-        <span :class="statusBadgeClass">
-          {{ t(`jobs.status.${job.status}`) }}
-        </span>
-        <div class="menu-wrapper">
+      <div class="job-header-meta-row">
+        <span class="assignee">{{ t('jobs.assignee') }}: {{ job.assignee }}</span>
+        <span v-if="job.client" class="assignee">{{ t('jobs.client') }}: {{ job.client.company_name }}</span>
+        <span :class="statusBadgeClass">{{ t(`jobs.status.${job.status}`) }}</span>
+        <span :class="priorityBadgeClass">{{ t(`jobs.priority.${effectivePriority}`) }}</span>
+        <span class="date">{{ t('jobs.dateAdded') }}: {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span>
+        <div ref="menuAnchorRef" class="menu-wrapper">
           <button
             type="button"
             class="btn-menu-trigger"
@@ -399,7 +410,6 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <span class="date">{{ t('jobs.dateAdded') }}: {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span>
       </div>
     </header>
 
@@ -661,34 +671,26 @@ onUnmounted(() => {
 
 .job-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.job-header h2 {
-  margin: 0 0 6px;
+.job-header-title-row h2 {
+  margin: 0;
   font-size: 20px;
+}
+
+.job-header-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .assignee {
   margin: 0;
   color: #4b5563;
   font-size: 14px;
-}
-
-.status {
-  text-align: right;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.status-with-menu {
-  position: relative;
 }
 
 .menu-wrapper {
@@ -1103,7 +1105,7 @@ details[open] .history-toggle::before {
   padding: 16px;
 }
 
-.is-compact .job-header h2 {
+.is-compact .job-header-title-row h2 {
   font-size: 16px;
   margin-bottom: 4px;
 }
@@ -1126,17 +1128,6 @@ details[open] .history-toggle::before {
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-
-@media (max-width: 720px) {
-  .job-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .status {
-    align-items: flex-start;
-  }
 }
 
 @media (max-width: 640px) {

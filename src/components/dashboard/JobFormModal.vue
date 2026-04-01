@@ -3,9 +3,9 @@ import { computed, reactive, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
-import { ASSIGNEE_OPTIONS, DEFAULT_ASSIGNEE } from '../../stores/jobs'
+import { ASSIGNEE_OPTIONS, DEFAULT_ASSIGNEE, JOB_PRIORITY_OPTIONS, DEFAULT_JOB_PRIORITY } from '../../stores/jobs'
 import { useClientsStore } from '../../stores/clients'
-import type { Assignee } from '../../types/job'
+import type { Assignee, JobPriority } from '../../types/job'
 
 const props = defineProps<{
   show: boolean
@@ -15,6 +15,7 @@ const props = defineProps<{
     name: string
     partsNeeded: number
     assignee: Assignee
+    priority: JobPriority
     clientId?: string | null
     sharePassword?: string | null
     hasSharePassword?: boolean
@@ -29,6 +30,7 @@ const emit = defineEmits<{
       name: string
       partsNeeded: number
       assignee: Assignee
+      priority: JobPriority
       clientId?: string | null
       sharePassword?: string | null
     }
@@ -43,6 +45,7 @@ const form = reactive({
   name: '',
   partsNeeded: 0,
   assignee: DEFAULT_ASSIGNEE,
+  priority: DEFAULT_JOB_PRIORITY as JobPriority,
   clientId: '',
   sharePassword: '',
   touched: false,
@@ -55,6 +58,7 @@ watch(
       form.name = ''
       form.partsNeeded = 0
       form.assignee = DEFAULT_ASSIGNEE
+      form.priority = DEFAULT_JOB_PRIORITY
       form.clientId = ''
       form.sharePassword = ''
       return
@@ -62,6 +66,7 @@ watch(
     form.name = values.name
     form.partsNeeded = values.partsNeeded
     form.assignee = values.assignee
+    form.priority = values.priority
     form.clientId = values.clientId ?? ''
     form.sharePassword = values.sharePassword ?? ''
   },
@@ -106,6 +111,7 @@ function handleSubmit() {
     name: form.name.trim(),
     partsNeeded: Number(form.partsNeeded),
     assignee: form.assignee,
+    priority: form.priority,
     clientId: form.clientId || null,
     sharePassword: form.sharePassword.trim() || null,
   })
@@ -164,6 +170,15 @@ function handleSubmit() {
           >
             <option v-for="assignee in ASSIGNEE_OPTIONS" :key="assignee" :value="assignee">
               {{ t(`jobs.assignees.${assignee.toLowerCase()}`) }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="job-priority">{{ t('jobs.priority.label') }}</label>
+          <select id="job-priority" v-model="form.priority" :disabled="submitting">
+            <option v-for="p in JOB_PRIORITY_OPTIONS" :key="p" :value="p">
+              {{ t(`jobs.priority.${p}`) }}
             </option>
           </select>
         </div>

@@ -28,5 +28,6 @@ export interface ClientJobRecord {
   delivered: number
   archived: boolean
   status: 'active' | 'completed' | 'archived'
+  priority: 'low' | 'normal' | 'high' | 'urgent'
   updated_at: string
 }

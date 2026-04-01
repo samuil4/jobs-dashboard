@@ -137,6 +137,13 @@ export default {
       completed: 'Completed',
       archived: 'Archived',
     },
+    priority: {
+      label: 'Priority',
+      low: 'Low',
+      normal: 'Normal',
+      high: 'High',
+      urgent: 'Urgent',
+    },
     empty: 'No jobs yet. Create a new one to get started.',
     archive: 'Archive',
     unarchive: 'Unarchive',

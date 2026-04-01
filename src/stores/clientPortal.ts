@@ -6,7 +6,7 @@ import type { ClientJobRecord } from '../types/client'
 import type { JobUpdateRecord, UpdateType } from '../types/job'
 
 const CLIENT_JOB_FIELDS =
-  'id, name, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, updated_at'
+  'id, name, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, priority, updated_at'
 
 export const useClientPortalStore = defineStore('clientPortal', () => {
   const jobs = ref<ClientJobRecord[]>([])

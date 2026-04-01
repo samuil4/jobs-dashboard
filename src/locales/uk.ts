@@ -137,6 +137,13 @@ export default {
       completed: 'Завершене',
       archived: 'В архіві',
     },
+    priority: {
+      label: 'Пріоритет',
+      low: 'Низький',
+      normal: 'Нормальний',
+      high: 'Високий',
+      urgent: 'Терміновий',
+    },
     empty: 'Немає завдань. Створіть нове, щоб почати.',
     archive: 'Архівувати',
     unarchive: 'Повернути',
