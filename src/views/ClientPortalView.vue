@@ -126,7 +126,13 @@ onUnmounted(() => {
             <tr v-for="job in filteredJobs" :key="job.id">
               <td class="job-name-cell">
                 <div class="job-name">{{ job.name }}</div>
-                <span class="badge" :class="{ 'badge-success': job.status === 'completed' }">
+                <span
+                  class="badge"
+                  :class="{
+                    'badge-success': job.status === 'completed',
+                    'badge-info': job.status === 'active',
+                  }"
+                >
                   {{ t(`jobs.status.${job.status}`) }}
                 </span>
               </td>
