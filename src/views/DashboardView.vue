@@ -29,14 +29,14 @@ const LS_HIDE_ARCHIVED_KEY = 'dashboard:hideArchivedInColumn'
 const LS_COMPLETED_COLUMN_COLLAPSED = 'dashboard:completedColumnCollapsed'
 const LS_CLIENT_GROUP_ORDER = 'dashboard:clientGroupOrder'
 const LS_CLIENT_GROUP_DETAILS_OPEN = 'dashboard:clientGroupDetailsOpen'
+const LS_EXPANDED_COMPLETED_CLIENT_GROUP = 'dashboard:expandedCompletedClientGroupKey'
 
 type ClientGroupDetailsOpenState = {
   active: Record<string, boolean>
-  completed: Record<string, boolean>
 }
 
 function loadClientGroupDetailsOpen(): ClientGroupDetailsOpenState {
-  const empty: ClientGroupDetailsOpenState = { active: {}, completed: {} }
+  const empty: ClientGroupDetailsOpenState = { active: {} }
   if (typeof localStorage === 'undefined') return empty
   try {
     const raw = localStorage.getItem(LS_CLIENT_GROUP_DETAILS_OPEN)
@@ -48,11 +48,7 @@ function loadClientGroupDetailsOpen(): ClientGroupDetailsOpenState {
       p.active && typeof p.active === 'object' && !Array.isArray(p.active)
         ? (p.active as Record<string, boolean>)
         : {}
-    const completed =
-      p.completed && typeof p.completed === 'object' && !Array.isArray(p.completed)
-        ? (p.completed as Record<string, boolean>)
-        : {}
-    return { active: { ...active }, completed: { ...completed } }
+    return { active: { ...active } }
   } catch {
     return empty
   }
@@ -65,18 +61,52 @@ watch(clientGroupDetailsOpen, () => {
   localStorage.setItem(LS_CLIENT_GROUP_DETAILS_OPEN, JSON.stringify(clientGroupDetailsOpen.value))
 }, { deep: true })
 
-function detailsSectionOpen(column: 'active' | 'completed', key: string): boolean {
-  const map = clientGroupDetailsOpen.value[column]
+function loadExpandedCompletedGroupKey(): string | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(LS_EXPANDED_COMPLETED_CLIENT_GROUP)
+    if (raw === null) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (parsed === null) return null
+    if (typeof parsed === 'string') return parsed
+    return null
+  } catch {
+    return null
+  }
+}
+
+const expandedCompletedGroupKey = ref<string | null>(loadExpandedCompletedGroupKey())
+
+watch(expandedCompletedGroupKey, (k) => {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(LS_EXPANDED_COMPLETED_CLIENT_GROUP, JSON.stringify(k))
+})
+
+function detailsSectionOpenActive(key: string): boolean {
+  const map = clientGroupDetailsOpen.value.active
   if (Object.prototype.hasOwnProperty.call(map, key)) return map[key]!
   return true
 }
 
-function onClientGroupDetailsToggle(column: 'active' | 'completed', key: string, event: Event) {
+function onClientGroupDetailsToggleActive(key: string, event: Event) {
   const el = event.currentTarget as HTMLDetailsElement | null
   if (!el || el.tagName !== 'DETAILS') return
   clientGroupDetailsOpen.value = {
     ...clientGroupDetailsOpen.value,
-    [column]: { ...clientGroupDetailsOpen.value[column], [key]: el.open },
+    active: { ...clientGroupDetailsOpen.value.active, [key]: el.open },
+  }
+}
+
+/** Accordion: at most one completed group open; ignore programmatic close of other sections. */
+function onCompletedClientGroupToggle(key: string, event: Event) {
+  const el = event.currentTarget as HTMLDetailsElement | null
+  if (!el || el.tagName !== 'DETAILS') return
+  if (el.open) {
+    expandedCompletedGroupKey.value = key
+    return
+  }
+  if (expandedCompletedGroupKey.value === key) {
+    expandedCompletedGroupKey.value = null
   }
 }
 
@@ -148,6 +178,16 @@ const orderedCompletedGroups = computed(() => {
   const m = groupJobsByClient(visibleCompletedJobs.value, resolveClientLabel)
   const keys = mergeOrder(clientGroupOrder.value, m)
   return keys.map((k) => m.get(k)!)
+})
+
+watch(orderedCompletedGroups, (groups) => {
+  const keys = new Set(groups.map((g) => g.key))
+  if (
+    expandedCompletedGroupKey.value !== null &&
+    !keys.has(expandedCompletedGroupKey.value)
+  ) {
+    expandedCompletedGroupKey.value = null
+  }
 })
 
 function moveClientSection(
@@ -541,9 +581,9 @@ const archiveConfirmLabel = computed(() =>
             <details
               v-for="(group, gi) in orderedCompletedGroups"
               :key="group.key"
-              :open="detailsSectionOpen('completed', group.key)"
+              :open="expandedCompletedGroupKey === group.key"
               class="client-group client-group-completed"
-              @toggle="onClientGroupDetailsToggle('completed', group.key, $event)"
+              @toggle="onCompletedClientGroupToggle(group.key, $event)"
             >
               <summary class="client-group-summary">
                 <span class="client-group-title">{{
@@ -623,9 +663,9 @@ const archiveConfirmLabel = computed(() =>
         <details
           v-for="(group, gi) in orderedActiveGroups"
           :key="group.key"
-          :open="detailsSectionOpen('active', group.key)"
+          :open="detailsSectionOpenActive(group.key)"
           class="client-group"
-          @toggle="onClientGroupDetailsToggle('active', group.key, $event)"
+          @toggle="onClientGroupDetailsToggleActive(group.key, $event)"
         >
           <summary class="client-group-summary">
             <span class="client-group-title">{{
@@ -779,6 +819,8 @@ const archiveConfirmLabel = computed(() =>
 }
 
 .client-group-completed {
+  flex-shrink: 0;
+  min-height: 0;
   box-shadow: none;
   border-radius: 10px;
   background: #fafafa;
@@ -854,6 +896,11 @@ const archiveConfirmLabel = computed(() =>
   flex-direction: column;
   gap: 10px;
   padding: 8px 6px 10px;
+  max-height: min(52vh, 340px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* ── Fixed drawer ── */
@@ -927,6 +974,7 @@ const archiveConfirmLabel = computed(() =>
 
 .completed-column-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
