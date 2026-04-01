@@ -10,15 +10,20 @@ export interface ClientGroup {
 
 export function groupJobsByClient(
   jobs: JobWithHistory[],
-  labelForFirstJob: (job: JobWithHistory, key: string) => string,
+  resolveLabel: (job: JobWithHistory, key: string) => string,
 ): Map<string, ClientGroup> {
   const map = new Map<string, ClientGroup>()
   for (const job of jobs) {
     const key = job.client_id ?? UNASSIGNED_KEY
-    if (!map.has(key)) {
-      map.set(key, { key, label: labelForFirstJob(job, key), jobs: [] })
+    const group = map.get(key)
+    if (!group) {
+      map.set(key, { key, label: resolveLabel(job, key), jobs: [job] })
+    } else {
+      group.jobs.push(job)
+      if (key !== UNASSIGNED_KEY && job.client?.company_name) {
+        group.label = resolveLabel(job, key)
+      }
     }
-    map.get(key)!.jobs.push(job)
   }
   return map
 }
