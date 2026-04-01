@@ -123,6 +123,10 @@ export default {
     assignee: 'Відповідальний',
     client: 'Клієнт',
     clientUnassigned: 'Не призначено',
+    clientUnknown: 'Невідомий клієнт',
+    clientGroupSummary: '{name} ({count})',
+    moveClientSectionUp: 'Перемістити секцію клієнта вгору',
+    moveClientSectionDown: 'Перемістити секцію клієнта вниз',
     assignees: {
       samuil: 'Самуїл',
       oleksii: 'Олексій',

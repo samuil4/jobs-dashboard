@@ -10,7 +10,13 @@ import JobFormModal from '../components/dashboard/JobFormModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useClientsStore } from '../stores/clients'
 import { useJobsStore } from '../stores/jobs'
-import type { Assignee, UpdateType } from '../types/job'
+import type { Assignee, JobWithHistory, UpdateType } from '../types/job'
+import {
+  UNASSIGNED_KEY,
+  groupJobsByClient,
+  mergeOrder,
+  swapKeysInOrder,
+} from '../utils/clientGroups'
 
 const jobsStore = useJobsStore()
 const clientsStore = useClientsStore()
@@ -20,8 +26,105 @@ const { t } = useI18n()
 const { filteredActiveJobs, filteredCompletedJobs, loading, error } = storeToRefs(jobsStore)
 
 const LS_HIDE_ARCHIVED_KEY = 'dashboard:hideArchivedInColumn'
+const LS_COMPLETED_COLUMN_COLLAPSED = 'dashboard:completedColumnCollapsed'
+const LS_CLIENT_GROUP_ORDER = 'dashboard:clientGroupOrder'
+const LS_CLIENT_GROUP_DETAILS_OPEN = 'dashboard:clientGroupDetailsOpen'
 
-const completedColumnCollapsed = ref(false)
+type ClientGroupDetailsOpenState = {
+  active: Record<string, boolean>
+  completed: Record<string, boolean>
+}
+
+function loadClientGroupDetailsOpen(): ClientGroupDetailsOpenState {
+  const empty: ClientGroupDetailsOpenState = { active: {}, completed: {} }
+  if (typeof localStorage === 'undefined') return empty
+  try {
+    const raw = localStorage.getItem(LS_CLIENT_GROUP_DETAILS_OPEN)
+    if (!raw) return empty
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return empty
+    const p = parsed as Record<string, unknown>
+    const active =
+      p.active && typeof p.active === 'object' && !Array.isArray(p.active)
+        ? (p.active as Record<string, boolean>)
+        : {}
+    const completed =
+      p.completed && typeof p.completed === 'object' && !Array.isArray(p.completed)
+        ? (p.completed as Record<string, boolean>)
+        : {}
+    return { active: { ...active }, completed: { ...completed } }
+  } catch {
+    return empty
+  }
+}
+
+const clientGroupDetailsOpen = ref<ClientGroupDetailsOpenState>(loadClientGroupDetailsOpen())
+
+watch(clientGroupDetailsOpen, () => {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(LS_CLIENT_GROUP_DETAILS_OPEN, JSON.stringify(clientGroupDetailsOpen.value))
+}, { deep: true })
+
+function detailsSectionOpen(column: 'active' | 'completed', key: string): boolean {
+  const map = clientGroupDetailsOpen.value[column]
+  if (Object.prototype.hasOwnProperty.call(map, key)) return map[key]!
+  return true
+}
+
+function onClientGroupDetailsToggle(column: 'active' | 'completed', key: string, event: Event) {
+  const el = event.currentTarget as HTMLDetailsElement | null
+  if (!el || el.tagName !== 'DETAILS') return
+  clientGroupDetailsOpen.value = {
+    ...clientGroupDetailsOpen.value,
+    [column]: { ...clientGroupDetailsOpen.value[column], [key]: el.open },
+  }
+}
+
+function loadClientGroupOrder(): string[] {
+  if (typeof localStorage === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(LS_CLIENT_GROUP_ORDER)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((x) => String(x))
+  } catch {
+    return []
+  }
+}
+
+const clientGroupOrder = ref<string[]>(loadClientGroupOrder())
+
+watch(
+  clientGroupOrder,
+  (v) => {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(LS_CLIENT_GROUP_ORDER, JSON.stringify(v))
+  },
+  { deep: true },
+)
+
+function resolveClientLabel(job: JobWithHistory, key: string): string {
+  if (key === UNASSIGNED_KEY) return t('jobs.clientUnassigned')
+  if (job.client) return job.client.company_name || job.client.username
+  return t('jobs.clientUnknown')
+}
+
+const orderedActiveGroups = computed(() => {
+  const m = groupJobsByClient(filteredActiveJobs.value, resolveClientLabel)
+  const keys = mergeOrder(clientGroupOrder.value, m)
+  return keys.map((k) => m.get(k)!)
+})
+
+const completedColumnCollapsed = ref(
+  typeof localStorage !== 'undefined' &&
+    localStorage.getItem(LS_COMPLETED_COLUMN_COLLAPSED) === 'true',
+)
+
+watch(completedColumnCollapsed, (collapsed) => {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(LS_COMPLETED_COLUMN_COLLAPSED, String(collapsed))
+})
 const hideArchivedInColumn = ref(
   typeof localStorage !== 'undefined' && localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
 )
@@ -40,6 +143,30 @@ const visibleCompletedJobs = computed(() =>
     ? filteredCompletedJobs.value.filter((job) => job.status !== 'archived')
     : filteredCompletedJobs.value,
 )
+
+const orderedCompletedGroups = computed(() => {
+  const m = groupJobsByClient(visibleCompletedJobs.value, resolveClientLabel)
+  const keys = mergeOrder(clientGroupOrder.value, m)
+  return keys.map((k) => m.get(k)!)
+})
+
+function moveClientSection(
+  column: 'active' | 'completed',
+  key: string,
+  direction: 'up' | 'down',
+) {
+  const list = column === 'active' ? filteredActiveJobs.value : visibleCompletedJobs.value
+  const columnMap = groupJobsByClient(list, resolveClientLabel)
+  const visibleKeys = mergeOrder(clientGroupOrder.value, columnMap)
+  const i = visibleKeys.indexOf(key)
+  if (i === -1) return
+  const j = direction === 'up' ? i - 1 : i + 1
+  if (j < 0 || j >= visibleKeys.length) return
+  const swapKey = visibleKeys[j]!
+  const fullMap = groupJobsByClient(jobsStore.jobs, resolveClientLabel)
+  const fullOrder = mergeOrder(clientGroupOrder.value, fullMap)
+  clientGroupOrder.value = swapKeysInOrder(fullOrder, key, swapKey)
+}
 
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
@@ -410,23 +537,60 @@ const archiveConfirmLabel = computed(() =>
             {{ t('jobs.completedEmpty') }}
           </div>
 
-          <JobCard
-            v-for="job in visibleCompletedJobs"
-            :key="job.id"
-            variant="completed"
-            :job="job"
-            :is-busy="isJobBusy(job.id)"
-            :is-notes-saving="notesPendingIds.has(job.id)"
-            :is-delivery-submitting="deliveryPendingIds.has(job.id)"
-            :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
-            @edit="openEditModal"
-            @archive="handleArchive"
-            @delete="handleDelete"
-            @editHistory="handleEditHistory"
-            @deleteHistory="handleDeleteHistory"
-            @delivery="handleDelivery"
-            @addFailedProduction="handleAddFailedProduction"
-          />
+          <template v-else-if="visibleCompletedJobs.length > 0">
+            <details
+              v-for="(group, gi) in orderedCompletedGroups"
+              :key="group.key"
+              :open="detailsSectionOpen('completed', group.key)"
+              class="client-group client-group-completed"
+              @toggle="onClientGroupDetailsToggle('completed', group.key, $event)"
+            >
+              <summary class="client-group-summary">
+                <span class="client-group-title">{{
+                  t('jobs.clientGroupSummary', { name: group.label, count: group.jobs.length })
+                }}</span>
+                <span class="client-group-actions" @click.stop>
+                  <button
+                    type="button"
+                    class="btn-client-move"
+                    :aria-label="t('jobs.moveClientSectionUp')"
+                    :disabled="gi === 0"
+                    @click="moveClientSection('completed', group.key, 'up')"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-client-move"
+                    :aria-label="t('jobs.moveClientSectionDown')"
+                    :disabled="gi === orderedCompletedGroups.length - 1"
+                    @click="moveClientSection('completed', group.key, 'down')"
+                  >
+                    ↓
+                  </button>
+                </span>
+              </summary>
+              <div class="jobs-completed-stack">
+                <JobCard
+                  v-for="job in group.jobs"
+                  :key="job.id"
+                  variant="completed"
+                  :job="job"
+                  :is-busy="isJobBusy(job.id)"
+                  :is-notes-saving="notesPendingIds.has(job.id)"
+                  :is-delivery-submitting="deliveryPendingIds.has(job.id)"
+                  :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
+                  @edit="openEditModal"
+                  @archive="handleArchive"
+                  @delete="handleDelete"
+                  @editHistory="handleEditHistory"
+                  @deleteHistory="handleDeleteHistory"
+                  @delivery="handleDelivery"
+                  @addFailedProduction="handleAddFailedProduction"
+                />
+              </div>
+            </details>
+          </template>
         </div>
       </div>
 
@@ -455,26 +619,61 @@ const archiveConfirmLabel = computed(() =>
         {{ t('jobs.activeEmpty') }}
       </div>
 
-      <div v-else class="jobs-grid">
-        <JobCard
-          v-for="job in filteredActiveJobs"
-          :key="job.id"
-          :job="job"
-          :is-busy="isJobBusy(job.id)"
-          :is-notes-saving="notesPendingIds.has(job.id)"
-          :is-production-submitting="productionPendingIds.has(job.id)"
-          :is-delivery-submitting="deliveryPendingIds.has(job.id)"
-          :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
-          @edit="openEditModal"
-          @archive="handleArchive"
-          @delete="handleDelete"
-          @production="handleProduction"
-          @editHistory="handleEditHistory"
-          @deleteHistory="handleDeleteHistory"
-          @updateNotes="handleUpdateNotes"
-          @delivery="handleDelivery"
-          @addFailedProduction="handleAddFailedProduction"
-        />
+      <div v-else class="jobs-by-client">
+        <details
+          v-for="(group, gi) in orderedActiveGroups"
+          :key="group.key"
+          :open="detailsSectionOpen('active', group.key)"
+          class="client-group"
+          @toggle="onClientGroupDetailsToggle('active', group.key, $event)"
+        >
+          <summary class="client-group-summary">
+            <span class="client-group-title">{{
+              t('jobs.clientGroupSummary', { name: group.label, count: group.jobs.length })
+            }}</span>
+            <span class="client-group-actions" @click.stop>
+              <button
+                type="button"
+                class="btn-client-move"
+                :aria-label="t('jobs.moveClientSectionUp')"
+                :disabled="gi === 0"
+                @click="moveClientSection('active', group.key, 'up')"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                class="btn-client-move"
+                :aria-label="t('jobs.moveClientSectionDown')"
+                :disabled="gi === orderedActiveGroups.length - 1"
+                @click="moveClientSection('active', group.key, 'down')"
+              >
+                ↓
+              </button>
+            </span>
+          </summary>
+          <div class="jobs-grid">
+            <JobCard
+              v-for="job in group.jobs"
+              :key="job.id"
+              :job="job"
+              :is-busy="isJobBusy(job.id)"
+              :is-notes-saving="notesPendingIds.has(job.id)"
+              :is-production-submitting="productionPendingIds.has(job.id)"
+              :is-delivery-submitting="deliveryPendingIds.has(job.id)"
+              :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
+              @edit="openEditModal"
+              @archive="handleArchive"
+              @delete="handleDelete"
+              @production="handleProduction"
+              @editHistory="handleEditHistory"
+              @deleteHistory="handleDeleteHistory"
+              @updateNotes="handleUpdateNotes"
+              @delivery="handleDelivery"
+              @addFailedProduction="handleAddFailedProduction"
+            />
+          </div>
+        </details>
       </div>
     </template>
 
@@ -563,6 +762,98 @@ const archiveConfirmLabel = computed(() =>
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.jobs-by-client {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.client-group {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.client-group-completed {
+  box-shadow: none;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.client-group-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  font-size: 13px;
+  color: #374151;
+  user-select: none;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.client-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-group-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.client-group-actions {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.btn-client-move {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.btn-client-move:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.btn-client-move:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.client-group .jobs-grid {
+  padding: 16px 16px 20px;
+}
+
+.jobs-completed-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 6px 10px;
 }
 
 /* ── Fixed drawer ── */

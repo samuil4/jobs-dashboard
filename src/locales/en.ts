@@ -123,6 +123,10 @@ export default {
     assignee: 'Assignee',
     client: 'Client',
     clientUnassigned: 'Unassigned',
+    clientUnknown: 'Unknown client',
+    clientGroupSummary: '{name} ({count})',
+    moveClientSectionUp: 'Move client section up',
+    moveClientSectionDown: 'Move client section down',
     assignees: {
       samuil: 'Samuil',
       oleksii: 'Oleksii',
