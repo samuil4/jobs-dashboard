@@ -6,7 +6,7 @@ import type { ClientJobRecord } from '../types/client'
 import type { JobUpdateRecord, UpdateType } from '../types/job'
 
 const CLIENT_JOB_FIELDS =
-  'id, name, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, updated_at'
+  'id, name, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, priority, updated_at'
 
 export const useClientPortalStore = defineStore('clientPortal', () => {
   const jobs = ref<ClientJobRecord[]>([])
@@ -14,6 +14,8 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const showArchived = ref(false)
+  const sortBy = ref<'updated_at' | 'status'>('updated_at')
+  const sortDir = ref<'asc' | 'desc'>('desc')
   const activeClientId = ref<string | null>(null)
   let channel: ReturnType<typeof supabase.channel> | null = null
 
@@ -124,16 +126,36 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     activeClientId.value = null
     showArchived.value = false
     error.value = null
+    sortBy.value = 'updated_at'
+    sortDir.value = 'desc'
   }
 
   async function toggleArchived(clientId: string) {
     await fetchJobs(clientId, !showArchived.value)
   }
 
+  function statusSortRank(status: ClientJobRecord['status']) {
+    if (status === 'active') return 0
+    if (status === 'completed') return 1
+    return 2
+  }
+
   const filteredJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
-    if (!query) return jobs.value
-    return jobs.value.filter((job) => job.name?.toLowerCase().includes(query))
+    const list = !query
+      ? [...jobs.value]
+      : jobs.value.filter((job) => job.name?.toLowerCase().includes(query))
+
+    const mul = sortDir.value === 'asc' ? 1 : -1
+    list.sort((a, b) => {
+      if (sortBy.value === 'updated_at') {
+        const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
+        const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
+        return mul * (ta - tb)
+      }
+      return mul * (statusSortRank(a.status) - statusSortRank(b.status))
+    })
+    return list
   })
 
   return {
@@ -142,6 +164,8 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     error,
     searchTerm,
     showArchived,
+    sortBy,
+    sortDir,
     filteredJobs,
     fetchJobs,
     toggleArchived,

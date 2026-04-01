@@ -6,6 +6,7 @@ import { formatISO } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import type {
   Assignee,
+  JobPriority,
   JobRecord,
   JobUpdateRecord,
   JobWithHistory,
@@ -16,8 +17,11 @@ import type {
 export const ASSIGNEE_OPTIONS: Assignee[] = ['Samuil', 'Oleksii', 'Veselin']
 export const DEFAULT_ASSIGNEE: Assignee = ASSIGNEE_OPTIONS[0]!
 
+export const JOB_PRIORITY_OPTIONS: JobPriority[] = ['low', 'normal', 'high', 'urgent']
+export const DEFAULT_JOB_PRIORITY: JobPriority = 'normal'
+
 const JOB_SELECT_FIELDS =
-  'id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, assignee, created_at, updated_at, client_id, has_share_password, client:clients(id, username, company_name), job_updates (*)'
+  'id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, priority, assignee, created_at, updated_at, client_id, has_share_password, client:clients(id, username, company_name), job_updates (*)'
 
 type StatusFilter = 'all' | 'active' | 'completed' | 'archived'
 type SelectedJobResponse = Omit<JobRecord, 'client'> & {
@@ -111,6 +115,7 @@ export const useJobsStore = defineStore('jobs', () => {
       parts_failed: 0,
       archived: false,
       status: 'active',
+      priority: payload.priority,
       assignee: payload.assignee,
       client_id: payload.clientId ?? null,
       created_at: now,
@@ -173,6 +178,7 @@ export const useJobsStore = defineStore('jobs', () => {
       parts_produced: newPartsProduced,
       parts_overproduced: newPartsOverproduced,
       assignee: payload.assignee,
+      priority: payload.priority,
       client_id: payload.clientId ?? null,
       status: job.archived ? 'archived' : newStatus,
       updated_at: formatISO(new Date()),
