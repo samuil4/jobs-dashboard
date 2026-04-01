@@ -10,7 +10,8 @@ const authStore = useAuthStore()
 const portalStore = useClientPortalStore()
 const { t } = useI18n()
 
-const { filteredJobs, loading, error, searchTerm, showArchived } = storeToRefs(portalStore)
+const { filteredJobs, loading, error, searchTerm, showArchived, sortBy, sortDir } =
+  storeToRefs(portalStore)
 
 const companyName = computed(() => authStore.clientCompanyName ?? t('clients.portalTitle'))
 
@@ -80,6 +81,26 @@ onUnmounted(() => {
         class="search-input"
         :placeholder="t('clients.searchPlaceholder')"
       />
+      <label class="toolbar-field">
+        <span class="sr-only">{{ t('clients.sortByLabel') }}</span>
+        <select v-model="sortBy" class="toolbar-select" :aria-label="t('clients.sortByLabel')">
+          <option value="updated_at">{{ t('clients.sortByUpdatedAt') }}</option>
+          <option value="status">{{ t('clients.sortByStatus') }}</option>
+        </select>
+      </label>
+      <label class="toolbar-field">
+        <span class="sr-only">{{ t('clients.sortOrderLabel') }}</span>
+        <select v-model="sortDir" class="toolbar-select" :aria-label="t('clients.sortOrderLabel')">
+          <template v-if="sortBy === 'updated_at'">
+            <option value="desc">{{ t('clients.sortDateNewest') }}</option>
+            <option value="asc">{{ t('clients.sortDateOldest') }}</option>
+          </template>
+          <template v-else>
+            <option value="asc">{{ t('clients.sortStatusActiveFirst') }}</option>
+            <option value="desc">{{ t('clients.sortStatusArchivedFirst') }}</option>
+          </template>
+        </select>
+      </label>
       <button
         class="btn btn-secondary"
         :class="{ 'is-loading': loading }"
@@ -179,13 +200,40 @@ onUnmounted(() => {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
 
 .search-input {
   flex: 1;
+  min-width: 160px;
   margin: 0;
+}
+
+.toolbar-field {
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+
+.toolbar-select {
+  width: auto;
+  min-width: 160px;
+  max-width: 100%;
+  margin: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .state {
