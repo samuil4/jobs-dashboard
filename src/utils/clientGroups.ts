@@ -2,6 +2,51 @@ import type { JobWithHistory } from '../types/job'
 
 export const UNASSIGNED_KEY = '__unassigned__'
 
+/** Sentinel key for jobs with no purchase order (grouped together, listed last). */
+export const NO_PO_KEY = '__no_po__'
+
+export interface PurchaseOrderSubgroup {
+  key: string
+  /** First-seen trimmed PO text (user casing); empty when `key === NO_PO_KEY` — use i18n in UI. */
+  headerPoLabel: string
+  jobs: JobWithHistory[]
+}
+
+/**
+ * Buckets jobs by trimmed PO, case-insensitive key; no-PO bucket last; within each bucket, newest `created_at` first.
+ */
+export function subgroupJobsByPurchaseOrder(jobs: JobWithHistory[]): PurchaseOrderSubgroup[] {
+  const buckets = new Map<string, JobWithHistory[]>()
+  const poDisplay = new Map<string, string>()
+  const insertOrder: string[] = []
+
+  for (const job of jobs) {
+    const trimmed = job.purchase_order?.trim() ?? ''
+    const key = trimmed ? trimmed.toLowerCase() : NO_PO_KEY
+    if (!buckets.has(key)) {
+      buckets.set(key, [])
+      insertOrder.push(key)
+      if (key !== NO_PO_KEY) {
+        poDisplay.set(key, trimmed)
+      }
+    }
+    buckets.get(key)!.push(job)
+  }
+
+  const poKeys = insertOrder.filter((k) => k !== NO_PO_KEY).sort((a, b) => a.localeCompare(b))
+  const orderedKeys = [...poKeys]
+  if (insertOrder.includes(NO_PO_KEY)) {
+    orderedKeys.push(NO_PO_KEY)
+  }
+
+  return orderedKeys.map((key) => {
+    const list = buckets.get(key)!
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    const headerPoLabel = key === NO_PO_KEY ? '' : (poDisplay.get(key) ?? key)
+    return { key, headerPoLabel, jobs: list }
+  })
+}
+
 export interface ClientGroup {
   key: string
   label: string

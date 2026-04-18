@@ -360,23 +360,34 @@ export const useJobsStore = defineStore('jobs', () => {
     })
   })
 
-  const filteredActiveJobs = computed(() => {
+  /** Dashboard main list: active and completed jobs (archived live in the side drawer only). */
+  const filteredMainListJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
-    if (statusFilter.value !== 'all' && statusFilter.value !== 'active') return []
+    if (statusFilter.value === 'archived') {
+      return []
+    }
     return jobs.value.filter((job) => {
-      if (job.status !== 'active') return false
+      if (job.status !== 'active' && job.status !== 'completed') {
+        return false
+      }
+      if (statusFilter.value === 'active' && job.status !== 'active') {
+        return false
+      }
+      if (statusFilter.value === 'completed' && job.status !== 'completed') {
+        return false
+      }
       return matchesSearch(job, query)
     })
   })
 
-  const filteredCompletedJobs = computed(() => {
+  /** Left drawer on staff dashboard: archived jobs only. */
+  const filteredArchivedJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
-    if (statusFilter.value !== 'all' && statusFilter.value !== 'completed' && statusFilter.value !== 'archived') {
+    if (statusFilter.value !== 'all' && statusFilter.value !== 'archived') {
       return []
     }
     return jobs.value.filter((job) => {
-      if (job.status !== 'completed' && job.status !== 'archived') return false
-      if (statusFilter.value !== 'all' && job.status !== statusFilter.value) return false
+      if (job.status !== 'archived') return false
       return matchesSearch(job, query)
     })
   })
@@ -873,8 +884,8 @@ export const useJobsStore = defineStore('jobs', () => {
     statusFilter,
     showArchived,
     filteredJobs,
-    filteredActiveJobs,
-    filteredCompletedJobs,
+    filteredMainListJobs,
+    filteredArchivedJobs,
     fetchJobs,
     createJob,
     updateJob,

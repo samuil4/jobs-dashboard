@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, reactive, ref, watch, type Ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, reactive, ref, watch, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 
 import ConfirmModal from '../components/ConfirmModal.vue'
@@ -12,9 +13,11 @@ import { useClientsStore } from '../stores/clients'
 import { useJobsStore } from '../stores/jobs'
 import type { Assignee, JobPriority, JobWithHistory, UpdateType } from '../types/job'
 import {
+  NO_PO_KEY,
   UNASSIGNED_KEY,
   groupJobsByClient,
   mergeOrder,
+  subgroupJobsByPurchaseOrder,
   swapKeysInOrder,
 } from '../utils/clientGroups'
 
@@ -23,13 +26,12 @@ const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
 
-const { filteredActiveJobs, filteredCompletedJobs, loading, error } = storeToRefs(jobsStore)
+const { filteredMainListJobs, filteredArchivedJobs, loading, error } = storeToRefs(jobsStore)
 
-const LS_HIDE_ARCHIVED_KEY = 'dashboard:hideArchivedInColumn'
-const LS_COMPLETED_COLUMN_COLLAPSED = 'dashboard:completedColumnCollapsed'
+const LS_ARCHIVED_COLUMN_COLLAPSED = 'dashboard:archivedColumnCollapsed'
 const LS_CLIENT_GROUP_ORDER = 'dashboard:clientGroupOrder'
 const LS_CLIENT_GROUP_DETAILS_OPEN = 'dashboard:clientGroupDetailsOpen'
-const LS_EXPANDED_COMPLETED_CLIENT_GROUP = 'dashboard:expandedCompletedClientGroupKey'
+const LS_EXPANDED_ARCHIVED_CLIENT_GROUP = 'dashboard:expandedArchivedClientGroupKey'
 
 type ClientGroupDetailsOpenState = {
   active: Record<string, boolean>
@@ -65,10 +67,13 @@ watch(
   { deep: true },
 )
 
-function loadExpandedCompletedGroupKey(): string | null {
+function loadExpandedArchivedGroupKey(): string | null {
   if (typeof localStorage === 'undefined') return null
   try {
-    const raw = localStorage.getItem(LS_EXPANDED_COMPLETED_CLIENT_GROUP)
+    let raw = localStorage.getItem(LS_EXPANDED_ARCHIVED_CLIENT_GROUP)
+    if (raw === null) {
+      raw = localStorage.getItem('dashboard:expandedCompletedClientGroupKey')
+    }
     if (raw === null) return null
     const parsed = JSON.parse(raw) as unknown
     if (parsed === null) return null
@@ -79,11 +84,11 @@ function loadExpandedCompletedGroupKey(): string | null {
   }
 }
 
-const expandedCompletedGroupKey = ref<string | null>(loadExpandedCompletedGroupKey())
+const expandedArchivedGroupKey = ref<string | null>(loadExpandedArchivedGroupKey())
 
-watch(expandedCompletedGroupKey, (k) => {
+watch(expandedArchivedGroupKey, (k) => {
   if (typeof localStorage === 'undefined') return
-  try { localStorage.setItem(LS_EXPANDED_COMPLETED_CLIENT_GROUP, JSON.stringify(k)) } catch { /* storage unavailable */ }
+  try { localStorage.setItem(LS_EXPANDED_ARCHIVED_CLIENT_GROUP, JSON.stringify(k)) } catch { /* storage unavailable */ }
 })
 
 function detailsSectionOpenActive(key: string): boolean {
@@ -101,16 +106,16 @@ function onClientGroupDetailsToggleActive(key: string, event: Event) {
   }
 }
 
-/** Accordion: at most one completed group open; ignore programmatic close of other sections. */
-function onCompletedClientGroupToggle(key: string, event: Event) {
+/** Accordion: at most one archived client group open. */
+function onArchivedClientGroupToggle(key: string, event: Event) {
   const el = event.currentTarget as HTMLDetailsElement | null
   if (!el || el.tagName !== 'DETAILS') return
   if (el.open) {
-    expandedCompletedGroupKey.value = key
+    expandedArchivedGroupKey.value = key
     return
   }
-  if (expandedCompletedGroupKey.value === key) {
-    expandedCompletedGroupKey.value = null
+  if (expandedArchivedGroupKey.value === key) {
+    expandedArchivedGroupKey.value = null
   }
 }
 
@@ -145,54 +150,72 @@ function resolveClientLabel(job: JobWithHistory, key: string): string {
 }
 
 const orderedActiveGroups = computed(() => {
-  const m = groupJobsByClient(filteredActiveJobs.value, resolveClientLabel)
+  const m = groupJobsByClient(filteredMainListJobs.value, resolveClientLabel)
   const keys = mergeOrder(clientGroupOrder.value, m)
   return keys.map((k) => m.get(k)!)
 })
 
-const completedColumnCollapsed = ref(
-  typeof localStorage !== 'undefined' &&
-    localStorage.getItem(LS_COMPLETED_COLUMN_COLLAPSED) === 'true',
+const orderedActiveGroupsWithPo = computed(() =>
+  orderedActiveGroups.value.map((g) => ({
+    ...g,
+    poSubgroups: subgroupJobsByPurchaseOrder(g.jobs),
+  })),
 )
 
-watch(completedColumnCollapsed, (collapsed) => {
-  if (typeof localStorage === 'undefined') return
-  try { localStorage.setItem(LS_COMPLETED_COLUMN_COLLAPSED, String(collapsed)) } catch { /* storage unavailable */ }
-})
-const hideArchivedInColumn = ref(
-  typeof localStorage !== 'undefined' && localStorage.getItem(LS_HIDE_ARCHIVED_KEY) === 'true',
-)
+/** PO sections in the main table: expanded by default; false = collapsed. */
+const poSubgroupOpen = ref<Record<string, boolean>>({})
 
-watch(hideArchivedInColumn, (val) => {
-  if (typeof localStorage === 'undefined') return
-  try { localStorage.setItem(LS_HIDE_ARCHIVED_KEY, String(val)) } catch { /* storage unavailable */ }
-})
-
-function toggleCompletedColumn() {
-  completedColumnCollapsed.value = !completedColumnCollapsed.value
+function poSubgroupCompositeKey(clientKey: string, poKey: string) {
+  return `${clientKey}::${poKey}`
 }
 
-const visibleCompletedJobs = computed(() =>
-  hideArchivedInColumn.value
-    ? filteredCompletedJobs.value.filter((job) => job.status !== 'archived')
-    : filteredCompletedJobs.value,
-)
+function isPoSubgroupOpen(clientKey: string, poKey: string): boolean {
+  const k = poSubgroupCompositeKey(clientKey, poKey)
+  // Must read poSubgroupOpen.value[k] so the render tracks this ref (hasOwnProperty does not).
+  const stored = poSubgroupOpen.value[k]
+  return stored === undefined ? true : stored
+}
 
-const orderedCompletedGroups = computed(() => {
-  const m = groupJobsByClient(visibleCompletedJobs.value, resolveClientLabel)
+function togglePoSubgroup(clientKey: string, poKey: string) {
+  const k = poSubgroupCompositeKey(clientKey, poKey)
+  const m = poSubgroupOpen.value
+  const cur = m[k] === undefined ? true : m[k]!
+  poSubgroupOpen.value = { ...m, [k]: !cur }
+}
+
+function loadArchivedColumnCollapsed(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  const v = localStorage.getItem(LS_ARCHIVED_COLUMN_COLLAPSED)
+  if (v !== null) return v === 'true'
+  return localStorage.getItem('dashboard:completedColumnCollapsed') === 'true'
+}
+
+const archivedColumnCollapsed = ref(loadArchivedColumnCollapsed())
+
+watch(archivedColumnCollapsed, (collapsed) => {
+  if (typeof localStorage === 'undefined') return
+  try { localStorage.setItem(LS_ARCHIVED_COLUMN_COLLAPSED, String(collapsed)) } catch { /* storage unavailable */ }
+})
+
+function toggleArchivedColumn() {
+  archivedColumnCollapsed.value = !archivedColumnCollapsed.value
+}
+
+const orderedArchivedGroups = computed(() => {
+  const m = groupJobsByClient(filteredArchivedJobs.value, resolveClientLabel)
   const keys = mergeOrder(clientGroupOrder.value, m)
   return keys.map((k) => m.get(k)!)
 })
 
-watch(orderedCompletedGroups, (groups) => {
+watch(orderedArchivedGroups, (groups) => {
   const keys = new Set(groups.map((g) => g.key))
-  if (expandedCompletedGroupKey.value !== null && !keys.has(expandedCompletedGroupKey.value)) {
-    expandedCompletedGroupKey.value = null
+  if (expandedArchivedGroupKey.value !== null && !keys.has(expandedArchivedGroupKey.value)) {
+    expandedArchivedGroupKey.value = null
   }
 })
 
-function moveClientSection(column: 'active' | 'completed', key: string, direction: 'up' | 'down') {
-  const list = column === 'active' ? filteredActiveJobs.value : visibleCompletedJobs.value
+function moveClientSection(column: 'main' | 'archived', key: string, direction: 'up' | 'down') {
+  const list = column === 'main' ? filteredMainListJobs.value : filteredArchivedJobs.value
   const columnMap = groupJobsByClient(list, resolveClientLabel)
   const visibleKeys = mergeOrder(clientGroupOrder.value, columnMap)
   const i = visibleKeys.indexOf(key)
@@ -257,10 +280,6 @@ const modalInitialValues = computed(() => {
     purchaseOrder: job.purchase_order,
     invoice: job.invoice,
   }
-})
-
-onMounted(async () => {
-  await Promise.all([jobsStore.fetchJobs(), clientsStore.fetchClients()])
 })
 
 async function withPending(set: Set<string>, jobId: string, action: () => Promise<void>) {
@@ -556,43 +575,96 @@ const archiveModalMessage = computed(() =>
 const archiveConfirmLabel = computed(() =>
   archiveModal.action === 'archive' ? t('jobs.archive') : t('jobs.unarchive'),
 )
+
+const detailJobId = ref<string | null>(null)
+
+const detailJob = computed(() =>
+  detailJobId.value ? jobsStore.jobs.find((j) => j.id === detailJobId.value) : undefined,
+)
+
+watch(detailJob, (job) => {
+  if (detailJobId.value && !job) {
+    detailJobId.value = null
+  }
+})
+
+function openJobDetail(jobId: string) {
+  detailJobId.value = jobId
+}
+
+function closeJobDetail() {
+  detailJobId.value = null
+}
+
+function onJobDetailKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && detailJobId.value) {
+    closeJobDetail()
+  }
+}
+
+function rowStatusClass(job: JobWithHistory) {
+  if (job.status === 'archived') return 'job-row-archived'
+  if (job.status === 'completed') return 'job-row-completed'
+  return 'job-row-active'
+}
+
+function displayPurchaseOrderCell(job: JobWithHistory) {
+  const s = job.purchase_order?.trim()
+  return s ? s : null
+}
+
+function totalProduced(job: JobWithHistory) {
+  return (job.parts_produced ?? 0) + (job.parts_overproduced ?? 0)
+}
+
+function partsRemainingRow(job: JobWithHistory) {
+  return Math.max(job.parts_needed - job.parts_produced, 0)
+}
+
+function readyForDeliveryRow(job: JobWithHistory) {
+  return Math.max(0, totalProduced(job) - (job.delivered ?? 0))
+}
+
+function clientLineLabel(job: JobWithHistory, groupKey: string) {
+  if (job.client) return job.client.company_name || job.client.username
+  if (groupKey === UNASSIGNED_KEY) return t('jobs.clientUnassigned')
+  return t('jobs.clientUnknown')
+}
+
+onMounted(async () => {
+  window.addEventListener('keydown', onJobDetailKeydown)
+  await Promise.all([jobsStore.fetchJobs(), clientsStore.fetchClients()])
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onJobDetailKeydown)
+})
 </script>
 
 <template>
   <section class="dashboard">
-    <!-- ── Fixed completed-jobs drawer ── -->
-    <aside class="completed-column" :class="{ 'is-collapsed': completedColumnCollapsed }">
-      <!-- Slide-in panel -->
-      <div v-show="!completedColumnCollapsed" class="drawer-panel">
+    <!-- ── Archived jobs drawer ── -->
+    <aside class="archived-column" :class="{ 'is-collapsed': archivedColumnCollapsed }">
+      <div v-show="!archivedColumnCollapsed" class="drawer-panel">
         <div class="column-header">
-          <h2 class="column-heading">{{ t('jobs.completedColumn') }}</h2>
-          <button
-            type="button"
-            class="btn-archived-toggle"
-            :class="{ 'is-active': hideArchivedInColumn }"
-            @click="hideArchivedInColumn = !hideArchivedInColumn"
-          >
-            {{
-              hideArchivedInColumn ? t('jobs.filter.showArchived') : t('jobs.filter.hideArchived')
-            }}
-          </button>
+          <h2 class="column-heading">{{ t('jobs.archivedColumn') }}</h2>
         </div>
 
-        <div class="completed-column-body">
+        <div class="archived-column-body">
           <div
-            v-if="!loading && !error && visibleCompletedJobs.length === 0"
+            v-if="!loading && !error && filteredArchivedJobs.length === 0"
             class="card state state-compact"
           >
-            {{ t('jobs.completedEmpty') }}
+            {{ t('jobs.archivedDrawerEmpty') }}
           </div>
 
-          <template v-else-if="visibleCompletedJobs.length > 0">
+          <template v-else-if="filteredArchivedJobs.length > 0">
             <details
-              v-for="(group, gi) in orderedCompletedGroups"
+              v-for="(group, gi) in orderedArchivedGroups"
               :key="group.key"
-              :open="expandedCompletedGroupKey === group.key"
-              class="client-group client-group-completed"
-              @toggle="onCompletedClientGroupToggle(group.key, $event)"
+              :open="expandedArchivedGroupKey === group.key"
+              class="client-group client-group-archived-drawer"
+              @toggle="onArchivedClientGroupToggle(group.key, $event)"
             >
               <summary class="client-group-summary">
                 <span class="client-group-title">{{
@@ -604,7 +676,7 @@ const archiveConfirmLabel = computed(() =>
                     class="btn-client-move"
                     :aria-label="t('jobs.moveClientSectionUp')"
                     :disabled="gi === 0"
-                    @click="moveClientSection('completed', group.key, 'up')"
+                    @click="moveClientSection('archived', group.key, 'up')"
                   >
                     ↑
                   </button>
@@ -612,14 +684,14 @@ const archiveConfirmLabel = computed(() =>
                     type="button"
                     class="btn-client-move"
                     :aria-label="t('jobs.moveClientSectionDown')"
-                    :disabled="gi === orderedCompletedGroups.length - 1"
-                    @click="moveClientSection('completed', group.key, 'down')"
+                    :disabled="gi === orderedArchivedGroups.length - 1"
+                    @click="moveClientSection('archived', group.key, 'down')"
                   >
                     ↓
                   </button>
                 </span>
               </summary>
-              <div class="jobs-completed-stack">
+              <div class="jobs-archived-stack">
                 <JobCard
                   v-for="job in group.jobs"
                   :key="job.id"
@@ -648,16 +720,16 @@ const archiveConfirmLabel = computed(() =>
       <button
         type="button"
         class="column-toggle-btn"
-        :aria-label="completedColumnCollapsed ? t('jobs.expandColumn') : t('jobs.collapseColumn')"
-        @click="toggleCompletedColumn"
+        :aria-label="archivedColumnCollapsed ? t('jobs.expandArchivedPanel') : t('jobs.collapseArchivedPanel')"
+        @click="toggleArchivedColumn"
       >
         <span class="column-toggle-icon" aria-hidden="true">
-          {{ completedColumnCollapsed ? '›' : '‹' }}
+          {{ archivedColumnCollapsed ? '›' : '‹' }}
         </span>
       </button>
     </aside>
 
-    <!-- ── Main content: full-width active jobs ── -->
+    <!-- ── Main list: active + completed jobs ── -->
     <div v-if="loading" class="card state">{{ t('common.loading') }}…</div>
 
     <div v-else-if="error" class="card state error">
@@ -665,13 +737,13 @@ const archiveConfirmLabel = computed(() =>
     </div>
 
     <template v-else>
-      <div v-if="filteredActiveJobs.length === 0" class="card state">
-        {{ t('jobs.activeEmpty') }}
+      <div v-if="filteredMainListJobs.length === 0" class="card state">
+        {{ t('jobs.mainListEmpty') }}
       </div>
 
       <div v-else class="jobs-by-client">
         <details
-          v-for="(group, gi) in orderedActiveGroups"
+          v-for="(group, gi) in orderedActiveGroupsWithPo"
           :key="group.key"
           :open="detailsSectionOpenActive(group.key)"
           class="client-group"
@@ -687,7 +759,7 @@ const archiveConfirmLabel = computed(() =>
                 class="btn-client-move"
                 :aria-label="t('jobs.moveClientSectionUp')"
                 :disabled="gi === 0"
-                @click="moveClientSection('active', group.key, 'up')"
+                @click="moveClientSection('main', group.key, 'up')"
               >
                 ↑
               </button>
@@ -695,33 +767,143 @@ const archiveConfirmLabel = computed(() =>
                 type="button"
                 class="btn-client-move"
                 :aria-label="t('jobs.moveClientSectionDown')"
-                :disabled="gi === orderedActiveGroups.length - 1"
-                @click="moveClientSection('active', group.key, 'down')"
+                :disabled="gi === orderedActiveGroupsWithPo.length - 1"
+                @click="moveClientSection('main', group.key, 'down')"
               >
                 ↓
               </button>
             </span>
           </summary>
-          <div class="jobs-grid">
-            <JobCard
-              v-for="job in group.jobs"
-              :key="job.id"
-              :job="job"
-              :is-busy="isJobBusy(job.id)"
-              :is-notes-saving="notesPendingIds.has(job.id)"
-              :is-production-submitting="productionPendingIds.has(job.id)"
-              :is-delivery-submitting="deliveryPendingIds.has(job.id)"
-              :is-failed-production-submitting="failedProductionPendingIds.has(job.id)"
-              @edit="openEditModal"
-              @archive="handleArchive"
-              @delete="handleDelete"
-              @production="handleProduction"
-              @editHistory="handleEditHistory"
-              @deleteHistory="handleDeleteHistory"
-              @updateNotes="handleUpdateNotes"
-              @delivery="handleDelivery"
-              @addFailedProduction="handleAddFailedProduction"
-            />
+          <div class="active-table-wrap">
+            <div class="table-wrap">
+              <table class="staff-jobs-table">
+                <thead>
+                  <tr>
+                    <th>{{ t('jobs.jobName') }}</th>
+                    <th>{{ t('jobs.tableColumnParts') }}</th>
+                    <th>{{ t('jobs.view') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template
+                    v-for="poSubgroup in group.poSubgroups"
+                    :key="`${group.key}:${poSubgroup.key}`"
+                  >
+                    <tr class="staff-po-subheader">
+                      <td colspan="3">
+                        <button
+                          type="button"
+                          class="staff-po-subheader-trigger"
+                          :aria-expanded="isPoSubgroupOpen(group.key, poSubgroup.key)"
+                          @click.stop="togglePoSubgroup(group.key, poSubgroup.key)"
+                        >
+                          <span
+                            class="staff-po-chevron"
+                            aria-hidden="true"
+                            :class="{ 'is-collapsed': !isPoSubgroupOpen(group.key, poSubgroup.key) }"
+                          />
+                          <span v-if="poSubgroup.key === NO_PO_KEY" class="staff-po-subheader-text">{{
+                            t('jobs.noPurchaseOrderGroup')
+                          }}</span>
+                          <span v-else class="staff-po-subheader-text"
+                            >PO: {{ poSubgroup.headerPoLabel }}</span
+                          >
+                        </button>
+                      </td>
+                    </tr>
+                    <tr
+                      v-for="job in poSubgroup.jobs"
+                      v-show="isPoSubgroupOpen(group.key, poSubgroup.key)"
+                      :key="job.id"
+                      class="staff-job-row"
+                    >
+                      <td class="job-name-cell" :class="rowStatusClass(job)">
+                        <div class="job-name-block">
+                          <div class="job-name-line">
+                            <template v-if="displayPurchaseOrderCell(job)">
+                              <span class="po-before-name"
+                                >PO: {{ displayPurchaseOrderCell(job) }}</span
+                              >
+                              {{ ' ' }}
+                            </template>
+                            <span class="job-name">{{ job.name }}</span>
+                          </div>
+                          <div class="job-name-meta">
+                            <span
+                              class="badge"
+                              :class="{
+                                'badge-success': job.status === 'completed',
+                                'badge-info': job.status === 'active',
+                                'badge-muted': job.status === 'archived',
+                              }"
+                            >
+                              {{ t(`jobs.status.${job.status}`) }}
+                            </span>
+                            <span
+                              class="badge"
+                              :class="{
+                                'badge-info': (job.priority ?? 'normal') === 'normal',
+                                'badge-warning': job.priority === 'high',
+                                'badge-danger': job.priority === 'urgent',
+                              }"
+                            >
+                              {{ t(`jobs.priority.${job.priority ?? 'normal'}`) }}
+                            </span>
+                          </div>
+                          <div class="job-row-secondary">
+                            <span>{{ clientLineLabel(job, group.key) }}</span>
+                            <span class="job-row-secondary-sep">·</span>
+                            <span
+                              >{{ t('jobs.dateAdded') }}:
+                              {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span
+                            >
+                            <span class="job-row-secondary-sep">·</span>
+                            <span>{{ t('jobs.assignee') }}: {{ job.assignee }}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="staff-parts-cell">
+                        <div class="staff-parts-grid">
+                          <div class="staff-parts-line">
+                            <span
+                              ><strong>{{ t('jobs.partsNeeded') }}</strong>
+                              {{ job.parts_needed }}</span
+                            >
+                            <span
+                              ><strong>{{ t('jobs.partsProduced') }}</strong>
+                              {{ totalProduced(job) }}</span
+                            >
+                            <span
+                              ><strong>{{ t('jobs.partsRemaining') }}</strong>
+                              {{ partsRemainingRow(job) }}</span
+                            >
+                          </div>
+                          <div class="staff-parts-line">
+                            <span
+                              ><strong>{{ t('jobs.delivered') }}</strong>
+                              {{ job.delivered ?? 0 }}</span
+                            >
+                            <span
+                              ><strong>{{ t('jobs.partsReadyForDelivery') }}</strong>
+                              {{ readyForDeliveryRow(job) }}</span
+                            >
+                          </div>
+                        </div>
+                      </td>
+                      <td class="staff-view-cell">
+                        <button
+                          type="button"
+                          class="btn btn-secondary btn-compact"
+                          @click="openJobDetail(job.id)"
+                        >
+                          {{ t('jobs.view') }}
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
           </div>
         </details>
       </div>
@@ -782,6 +964,48 @@ const archiveConfirmLabel = computed(() =>
       @cancel="closeHistoryDeleteModal"
       @confirm="confirmDeleteHistory"
     />
+
+    <Teleport to="body">
+      <div
+        v-if="detailJobId && detailJob"
+        class="job-detail-backdrop"
+        @click.self="closeJobDetail"
+      >
+        <aside
+          class="job-detail-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="job-detail-drawer-title"
+        >
+          <header class="job-detail-panel-header">
+            <h2 id="job-detail-drawer-title" class="job-detail-panel-title">{{ detailJob.name }}</h2>
+            <button type="button" class="btn btn-ghost btn-compact" @click="closeJobDetail">
+              {{ t('common.close') }}
+            </button>
+          </header>
+          <div class="job-detail-panel-body">
+            <JobCard
+              :job="detailJob"
+              :variant="detailJob.status === 'completed' ? 'completed' : 'default'"
+              :is-busy="isJobBusy(detailJob.id)"
+              :is-notes-saving="notesPendingIds.has(detailJob.id)"
+              :is-production-submitting="productionPendingIds.has(detailJob.id)"
+              :is-delivery-submitting="deliveryPendingIds.has(detailJob.id)"
+              :is-failed-production-submitting="failedProductionPendingIds.has(detailJob.id)"
+              @edit="openEditModal"
+              @archive="handleArchive"
+              @delete="handleDelete"
+              @production="handleProduction"
+              @editHistory="handleEditHistory"
+              @deleteHistory="handleDeleteHistory"
+              @updateNotes="handleUpdateNotes"
+              @delivery="handleDelivery"
+              @addFailedProduction="handleAddFailedProduction"
+            />
+          </div>
+        </aside>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -808,12 +1032,6 @@ const archiveConfirmLabel = computed(() =>
   font-size: 13px;
 }
 
-.jobs-grid {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-}
-
 .jobs-by-client {
   display: flex;
   flex-direction: column;
@@ -828,7 +1046,7 @@ const archiveConfirmLabel = computed(() =>
   overflow: hidden;
 }
 
-.client-group-completed {
+.client-group-archived-drawer {
   flex-shrink: 0;
   min-height: 0;
   box-shadow: none;
@@ -897,11 +1115,235 @@ const archiveConfirmLabel = computed(() =>
   cursor: not-allowed;
 }
 
-.client-group .jobs-grid {
-  padding: 16px 16px 20px;
+.active-table-wrap {
+  padding: 0 0 16px;
 }
 
-.jobs-completed-stack {
+.table-wrap {
+  overflow-x: auto;
+}
+
+.staff-jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.staff-jobs-table th,
+.staff-jobs-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+
+.staff-jobs-table th {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+  background: #f9fafb;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.staff-po-subheader td {
+  padding: 0;
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.staff-po-subheader-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.staff-po-subheader-trigger:hover {
+  background: #e5e7eb;
+}
+
+.staff-po-chevron {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #6b7280;
+  transition: transform 0.15s;
+}
+
+.staff-po-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.staff-po-subheader-text {
+  display: block;
+}
+
+.job-name-cell.job-row-active {
+  box-shadow: inset 4px 0 0 0 #2563eb;
+}
+
+.job-name-cell.job-row-completed {
+  box-shadow: inset 4px 0 0 0 #16a34a;
+}
+
+.job-name-cell.job-row-archived {
+  box-shadow: inset 4px 0 0 0 #9ca3af;
+}
+
+.job-name-cell {
+  min-width: 220px;
+}
+
+.job-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.job-name-line {
+  font-weight: 600;
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.35;
+}
+
+.po-before-name {
+  font-weight: 600;
+  color: #374151;
+}
+
+.job-name {
+  font-weight: 600;
+}
+
+.job-name-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.badge-muted {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.job-row-secondary {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.job-row-secondary-sep {
+  margin: 0 4px;
+  color: #9ca3af;
+}
+
+.staff-parts-cell {
+  min-width: 200px;
+}
+
+.staff-parts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.staff-parts-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.staff-parts-line strong {
+  font-weight: 600;
+  color: #6b7280;
+  margin-right: 4px;
+}
+
+.staff-view-cell {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.job-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.job-detail-panel {
+  width: min(480px, 92vw);
+  max-width: 100%;
+  background: #fff;
+  box-shadow: -8px 0 32px rgba(15, 23, 42, 0.15);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  animation: job-detail-slide-in 0.22s ease-out;
+}
+
+@keyframes job-detail-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.job-detail-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.job-detail-panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-detail-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.jobs-archived-stack {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -913,8 +1355,8 @@ const archiveConfirmLabel = computed(() =>
   overscroll-behavior: contain;
 }
 
-/* ── Fixed drawer ── */
-.completed-column {
+/* ── Archived drawer (left) ── */
+.archived-column {
   position: fixed;
   left: 0;
   top: 56px;
@@ -959,31 +1401,7 @@ const archiveConfirmLabel = computed(() =>
   color: #6b7280;
 }
 
-.btn-archived-toggle {
-  flex-shrink: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-  padding: 3px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  color: #6b7280;
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s;
-}
-
-.btn-archived-toggle:hover,
-.btn-archived-toggle.is-active {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #d1d5db;
-}
-
-.completed-column-body {
+.archived-column-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1030,7 +1448,7 @@ const archiveConfirmLabel = computed(() =>
 
 /* ── Responsive: mobile ── */
 @media (max-width: 768px) {
-  .completed-column {
+  .archived-column {
     top: auto;
     bottom: 48px;
     left: 0;
