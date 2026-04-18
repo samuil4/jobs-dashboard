@@ -160,6 +160,16 @@ async function handleDeliverySubmit() {
 const canShare = computed(() => Boolean(props.job.has_share_password))
 const shareLinkCopied = ref(false)
 
+const displayPurchaseOrder = computed(() => {
+  const s = props.job.purchase_order?.trim()
+  return s ? s : null
+})
+
+const displayInvoice = computed(() => {
+  const s = props.job.invoice?.trim()
+  return s ? s : null
+})
+
 const totalFailed = computed(() => props.job.parts_failed ?? 0)
 const failedPercent = computed(() => {
   const totalProduction = totalProduced.value
@@ -280,7 +290,13 @@ onUnmounted(() => {
   <article class="job-card card" :class="{ 'is-compact': variant === 'completed' }">
     <header class="job-header">
       <div class="job-header-title-row">
-        <h2>{{ job.name }}</h2>
+        <h2 class="job-title-heading">
+          <template v-if="displayPurchaseOrder">
+            <span class="po-before-name">PO: {{ displayPurchaseOrder }}</span>
+            {{ ' ' }}
+          </template>
+          {{ job.name }}
+        </h2>
         <div ref="menuAnchorRef" class="menu-wrapper">
           <button
             type="button"
@@ -404,6 +420,10 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+      <p v-if="displayInvoice" class="job-header-invoice-row">
+        <span class="invoice-label">{{ t('jobs.invoice') }}:</span>
+        {{ displayInvoice }}
+      </p>
       <div class="job-header-meta-row">
         <span class="assignee">{{ t('jobs.assignee') }}: {{ job.assignee }}</span>
         <span v-if="job.client" class="assignee">{{ t('jobs.client') }}: {{ job.client.company_name }}</span>
@@ -441,12 +461,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-if="variant === 'completed' && job.notes" class="notes-section">
-        <span class="notes-label">{{ t('jobs.notes') }}</span>
-        <p class="notes-text">{{ job.notes }}</p>
-      </div>
-
-      <div v-if="variant !== 'completed'" class="notes-section">
+      <div class="notes-section">
         <label :for="`notes-${job.id}`" class="notes-label">{{ t('jobs.notes') }}</label>
         <textarea
           :id="`notes-${job.id}`"
@@ -685,6 +700,24 @@ onUnmounted(() => {
 .job-header-title-row h2 {
   margin: 0;
   font-size: 20px;
+}
+
+.job-title-heading .po-before-name {
+  font-weight: 600;
+  color: #374151;
+}
+
+.job-header-invoice-row {
+  margin: 0;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.job-header-invoice-row .invoice-label {
+  font-weight: 600;
+  color: #374151;
+  margin-right: 4px;
 }
 
 .job-header-meta-row {

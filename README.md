@@ -4,10 +4,10 @@ Manufacturing jobs dashboard built with Vue 3 + Vite. Tracks production targets,
 
 ## Features
 
-- Create, edit and archive jobs with name, target quantity, produced quantity, assignee (`Samuil`, `Oleksii`, `Veselin`), and priority (`Low`, `Normal`, `High`, `Urgent`) with color-coded badges.
+- Create, edit and archive jobs with name, optional **purchase order (PO)** (shown as `PO: …` before the job name on staff cards and in the client portal only when set), optional **invoice** (staff job form only; in the client portal it appears after the status badge on the job row when set), target quantity, produced quantity, assignee (`Samuil`, `Oleksii`, `Veselin`), and priority (`Low`, `Normal`, `High`, `Urgent`) with color-coded badges.
 - Assign each job to a client, or leave it unassigned.
 - Manage clients from a dedicated staff page with add, edit, delete, and calculated workload totals.
-- Client portal with separate login, client-only routing, and client-only job visibility.
+- Client portal with separate login, client-only routing, and client-only job visibility: jobs table with status color accent (active blue, completed green, archived gray), columns **Requested / Produced / Delivered / Ready for pickup** (produced minus delivered), PO before the job name when present, invoice after the status badge when set, progress under the name, fixed ordering (in-progress jobs first by priority, then completed, then archived; ties by `created_at` newest first), and search by job name, PO, or invoice.
 - Header actions grouped into a dropdown menu, including navigation to the clients page.
 - Incremental production updates with confirmation when exceeding the remaining quantity.
 - Automatic completion state when produced equals required.
@@ -285,6 +285,24 @@ COMMENT ON COLUMN public.jobs.priority IS 'Job priority level: low, normal, high
 
 Existing jobs default to `normal`. The priority badge is displayed next to the status badge on each job card and in the client portal.
 
+2.8. Add optional purchase order on jobs by running `supabase/migrations/0010_job_purchase_order.sql`:
+
+```sql
+ALTER TABLE public.jobs
+ADD COLUMN IF NOT EXISTS purchase_order text NULL;
+```
+
+Staff set or clear PO from the job create/edit modal. Empty values are stored as `NULL` and are not shown in the UI.
+
+2.9. Add optional invoice on jobs by running `supabase/migrations/0011_job_invoice.sql`:
+
+```sql
+ALTER TABLE public.jobs
+ADD COLUMN IF NOT EXISTS invoice text NULL;
+```
+
+Staff set or clear invoice from the job create/edit modal. When set, clients see **Invoice:** _value_ after the status badge on the portal job row.
+
 3. Create at least one Supabase auth user for staff. The app expects usernames without domain; during login the username is transformed into an email using `VITE_SUPABASE_AUTH_EMAIL_DOMAIN` (default `example.com`). For example, username `operator` becomes Supabase email `operator@example.com`.
 
 4. Deploy the staff-only Edge Function used by the clients page to create, update, and delete client auth users:
@@ -330,7 +348,8 @@ After applying migration `0007_clients_and_client_access.sql` and deploying `man
 - a separate client login at `/client/login`
 - a client jobs page at `/client/jobs`
 - route protection so clients cannot navigate to staff pages
-- client-scoped search and archived-job toggling in the client portal
+- client-scoped search (job name, PO, or invoice) and archived-job toggling in the client portal
+- editable **notes** on jobs in the completed and archived drawer (same behavior as active job cards)
 
 Client credentials are stored in Supabase Auth. Client usernames are converted internally to emails using the fixed domain `clients.jobs-dashboard.local`, so client accounts should be created through the app's clients page rather than manually in the Auth dashboard.
 
@@ -367,11 +386,13 @@ If the code is already pulled locally, the remaining setup to make the new clien
 
 1. Apply `supabase/migrations/0007_clients_and_client_access.sql`.
 2. Apply `supabase/migrations/0009_job_priority.sql` to add the priority column.
-3. Deploy `manage-client-users`.
-4. Redeploy `send-manufacturing-push` so it includes client portal subscriptions.
-5. Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the deployed Edge Functions.
-6. Create at least one staff account in Supabase Auth.
-7. Sign in as staff and create client accounts from the new clients page instead of creating them manually in the Supabase Auth dashboard.
+3. Apply `supabase/migrations/0010_job_purchase_order.sql` for the optional `purchase_order` column (required for current app versions that read/write this field).
+4. Apply `supabase/migrations/0011_job_invoice.sql` for the optional `invoice` column when using app versions that read/write this field.
+5. Deploy `manage-client-users`.
+6. Redeploy `send-manufacturing-push` so it includes client portal subscriptions.
+7. Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the deployed Edge Functions.
+8. Create at least one staff account in Supabase Auth.
+9. Sign in as staff and create client accounts from the new clients page instead of creating them manually in the Supabase Auth dashboard.
 
 Recommended manual verification after setup:
 
@@ -384,6 +405,10 @@ Recommended manual verification after setup:
 7. Client can only access `/client/jobs` and is redirected away from staff routes.
 8. Client only sees jobs assigned to that client.
 9. Archived client jobs stay hidden until explicitly requested.
+10. Staff can set an optional PO on a job; it appears before the job name when present.
+11. Staff can edit notes on jobs in the completed/archived column.
+12. Client portal list order and columns match the behavior described under **Features** (including **Ready for pickup**).
+13. Staff can set an optional invoice; clients see it after the status on the portal row when present.
 
 ### Build for Production
 

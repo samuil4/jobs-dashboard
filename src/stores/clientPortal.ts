@@ -6,7 +6,7 @@ import type { ClientJobRecord } from '../types/client'
 import type { JobUpdateRecord, UpdateType } from '../types/job'
 
 const CLIENT_JOB_FIELDS =
-  'id, name, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, priority, updated_at'
+  'id, name, purchase_order, invoice, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, priority, created_at, updated_at'
 
 export const useClientPortalStore = defineStore('clientPortal', () => {
   const jobs = ref<ClientJobRecord[]>([])
@@ -14,8 +14,6 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const showArchived = ref(false)
-  const sortBy = ref<'updated_at' | 'status'>('updated_at')
-  const sortDir = ref<'asc' | 'desc'>('desc')
   const activeClientId = ref<string | null>(null)
   let channel: ReturnType<typeof supabase.channel> | null = null
 
@@ -45,7 +43,12 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
       return
     }
 
-    jobs.value = (data ?? []) as ClientJobRecord[]
+    jobs.value = (data ?? []).map((row) => ({
+      ...(row as ClientJobRecord),
+      purchase_order: (row as { purchase_order?: string | null }).purchase_order ?? null,
+      invoice: (row as { invoice?: string | null }).invoice ?? null,
+      created_at: (row as { created_at?: string }).created_at ?? '',
+    }))
     showArchived.value = includeArchived
     activeClientId.value = clientId
     loading.value = false
@@ -126,8 +129,6 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     activeClientId.value = null
     showArchived.value = false
     error.value = null
-    sortBy.value = 'updated_at'
-    sortDir.value = 'desc'
   }
 
   async function toggleArchived(clientId: string) {
@@ -140,21 +141,50 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     return 2
   }
 
+  function prioritySortRank(priority: ClientJobRecord['priority']) {
+    switch (priority) {
+      case 'urgent':
+        return 0
+      case 'high':
+        return 1
+      case 'normal':
+        return 2
+      case 'low':
+        return 3
+      default:
+        return 2
+    }
+  }
+
   const filteredJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
     const list = !query
       ? [...jobs.value]
-      : jobs.value.filter((job) => job.name?.toLowerCase().includes(query))
+      : jobs.value.filter((job) => {
+          const name = job.name?.toLowerCase() ?? ''
+          const po = job.purchase_order?.trim().toLowerCase() ?? ''
+          const inv = job.invoice?.trim().toLowerCase() ?? ''
+          return (
+            name.includes(query) ||
+            (po.length > 0 && po.includes(query)) ||
+            (inv.length > 0 && inv.includes(query))
+          )
+        })
 
-    const mul = sortDir.value === 'asc' ? 1 : -1
     list.sort((a, b) => {
-      if (sortBy.value === 'updated_at') {
-        const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
-        const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
-        return mul * (ta - tb)
+      const st = statusSortRank(a.status) - statusSortRank(b.status)
+      if (st !== 0) return st
+
+      if (a.status === 'active') {
+        const pr = prioritySortRank(a.priority) - prioritySortRank(b.priority)
+        if (pr !== 0) return pr
       }
-      return mul * (statusSortRank(a.status) - statusSortRank(b.status))
+
+      const ca = a.created_at ? new Date(a.created_at).getTime() : 0
+      const cb = b.created_at ? new Date(b.created_at).getTime() : 0
+      return cb - ca
     })
+
     return list
   })
 
@@ -164,8 +194,6 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     error,
     searchTerm,
     showArchived,
-    sortBy,
-    sortDir,
     filteredJobs,
     fetchJobs,
     toggleArchived,

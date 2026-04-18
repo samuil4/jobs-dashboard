@@ -19,6 +19,8 @@ const props = defineProps<{
     clientId?: string | null
     sharePassword?: string | null
     hasSharePassword?: boolean
+    purchaseOrder?: string | null
+    invoice?: string | null
   }
 }>()
 
@@ -33,6 +35,8 @@ const emit = defineEmits<{
       priority: JobPriority
       clientId?: string | null
       sharePassword?: string | null
+      purchaseOrder?: string | null
+      invoice?: string | null
     }
   ): void
 }>()
@@ -48,6 +52,8 @@ const form = reactive({
   priority: DEFAULT_JOB_PRIORITY as JobPriority,
   clientId: '',
   sharePassword: '',
+  purchaseOrder: '',
+  invoice: '',
   touched: false,
 })
 
@@ -61,6 +67,8 @@ watch(
       form.priority = DEFAULT_JOB_PRIORITY
       form.clientId = ''
       form.sharePassword = ''
+      form.purchaseOrder = ''
+      form.invoice = ''
       return
     }
     form.name = values.name
@@ -69,6 +77,8 @@ watch(
     form.priority = values.priority
     form.clientId = values.clientId ?? ''
     form.sharePassword = values.sharePassword ?? ''
+    form.purchaseOrder = values.purchaseOrder ?? ''
+    form.invoice = values.invoice ?? ''
   },
   { immediate: true }
 )
@@ -114,6 +124,8 @@ function handleSubmit() {
     priority: form.priority,
     clientId: form.clientId || null,
     sharePassword: form.sharePassword.trim() || null,
+    purchaseOrder: form.purchaseOrder.trim() || null,
+    invoice: form.invoice.trim() || null,
   })
 }
 </script>
@@ -142,6 +154,30 @@ function handleSubmit() {
           <p v-if="form.touched && !form.name" class="error">
             {{ t('common.required') }}
           </p>
+        </div>
+
+        <div>
+          <label for="job-purchase-order">{{ t('jobs.purchaseOrder') }}</label>
+          <input
+            id="job-purchase-order"
+            v-model="form.purchaseOrder"
+            type="text"
+            :disabled="submitting"
+            :placeholder="t('jobs.purchaseOrderPlaceholder')"
+            autocomplete="off"
+          />
+        </div>
+
+        <div>
+          <label for="job-invoice">{{ t('jobs.invoice') }}</label>
+          <input
+            id="job-invoice"
+            v-model="form.invoice"
+            type="text"
+            :disabled="submitting"
+            :placeholder="t('jobs.invoicePlaceholder')"
+            autocomplete="off"
+          />
         </div>
 
         <div>

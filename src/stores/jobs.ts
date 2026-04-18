@@ -21,7 +21,7 @@ export const JOB_PRIORITY_OPTIONS: JobPriority[] = ['low', 'normal', 'high', 'ur
 export const DEFAULT_JOB_PRIORITY: JobPriority = 'normal'
 
 const JOB_SELECT_FIELDS =
-  'id, name, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, priority, assignee, created_at, updated_at, client_id, has_share_password, client:clients(id, username, company_name), job_updates (*)'
+  'id, name, purchase_order, invoice, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, priority, assignee, created_at, updated_at, client_id, has_share_password, client:clients(id, username, company_name), job_updates (*)'
 
 type StatusFilter = 'all' | 'active' | 'completed' | 'archived'
 type SelectedJobResponse = Omit<JobRecord, 'client'> & {
@@ -62,6 +62,8 @@ export const useJobsStore = defineStore('jobs', () => {
     const selected = row as SelectedJobResponse
     return {
       ...selected,
+      purchase_order: selected.purchase_order ?? null,
+      invoice: selected.invoice ?? null,
       client: Array.isArray(selected.client) ? selected.client[0] ?? null : selected.client ?? null,
     }
   }
@@ -105,8 +107,18 @@ export const useJobsStore = defineStore('jobs', () => {
       payload.sharePassword != null && payload.sharePassword.trim() !== ''
         ? await bcrypt.hash(payload.sharePassword.trim(), 10)
         : null
+    const po =
+      payload.purchaseOrder != null && payload.purchaseOrder.trim() !== ''
+        ? payload.purchaseOrder.trim()
+        : null
+    const inv =
+      payload.invoice != null && payload.invoice.trim() !== ''
+        ? payload.invoice.trim()
+        : null
     const insertPayload: Record<string, unknown> = {
       name: payload.name,
+      purchase_order: po,
+      invoice: inv,
       parts_needed: payload.partsNeeded,
       parts_produced: 0,
       parts_overproduced: 0,
@@ -172,8 +184,18 @@ export const useJobsStore = defineStore('jobs', () => {
           ? await bcrypt.hash(payload.sharePassword.trim(), 10)
           : null
         : undefined
+    const po =
+      payload.purchaseOrder != null && payload.purchaseOrder.trim() !== ''
+        ? payload.purchaseOrder.trim()
+        : null
+    const inv =
+      payload.invoice != null && payload.invoice.trim() !== ''
+        ? payload.invoice.trim()
+        : null
     const updatePayload: Record<string, unknown> = {
       name: payload.name,
+      purchase_order: po,
+      invoice: inv,
       parts_needed: payload.partsNeeded,
       parts_produced: newPartsProduced,
       parts_overproduced: newPartsOverproduced,
@@ -313,9 +335,13 @@ export const useJobsStore = defineStore('jobs', () => {
 
   function matchesSearch(job: JobWithHistory, query: string): boolean {
     if (!query) return true
+    const po = job.purchase_order?.trim().toLowerCase() ?? ''
+    const inv = job.invoice?.trim().toLowerCase() ?? ''
     return (
       job.name.toLowerCase().includes(query) ||
       job.assignee.toLowerCase().includes(query) ||
+      (po && po.includes(query)) ||
+      (inv && inv.includes(query)) ||
       (job.client?.company_name?.toLowerCase().includes(query) ?? false) ||
       (job.client?.username?.toLowerCase().includes(query) ?? false)
     )

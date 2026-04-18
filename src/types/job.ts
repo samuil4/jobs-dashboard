@@ -7,6 +7,8 @@ export type JobPriority = 'low' | 'normal' | 'high' | 'urgent'
 export interface JobRecord {
   id: string
   name: string
+  purchase_order: string | null
+  invoice: string | null
   parts_needed: number
   parts_produced: number
   parts_overproduced: number
@@ -51,6 +53,8 @@ export interface NewJobPayload {
   priority: JobPriority
   clientId?: string | null
   sharePassword?: string | null
+  purchaseOrder?: string | null
+  invoice?: string | null
 }
 
 export interface UpdateJobPayload {
@@ -60,6 +64,8 @@ export interface UpdateJobPayload {
   priority: JobPriority
   clientId?: string | null
   sharePassword?: string | null
+  purchaseOrder?: string | null
+  invoice?: string | null
 }
 
 export interface JobShareData {

@@ -254,6 +254,8 @@ const modalInitialValues = computed(() => {
     priority: job.priority,
     clientId: job.client_id,
     hasSharePassword: Boolean(job.has_share_password),
+    purchaseOrder: job.purchase_order,
+    invoice: job.invoice,
   }
 })
 
@@ -306,6 +308,8 @@ async function handleModalSubmit(payload: {
   priority: JobPriority
   clientId?: string | null
   sharePassword?: string | null
+  purchaseOrder?: string | null
+  invoice?: string | null
 }) {
   if (modalSubmitting.value) return
 
@@ -321,12 +325,16 @@ async function handleModalSubmit(payload: {
         priority: JobPriority
         clientId?: string | null
         sharePassword?: string | null
+        purchaseOrder?: string | null
+        invoice?: string | null
       } = {
         name: payload.name,
         partsNeeded: payload.partsNeeded,
         assignee: payload.assignee,
         priority: payload.priority,
         clientId: payload.clientId ?? null,
+        purchaseOrder: payload.purchaseOrder ?? null,
+        invoice: payload.invoice ?? null,
       }
       if (payload.sharePassword != null && payload.sharePassword.trim() !== '') {
         updatePayload.sharePassword = payload.sharePassword
@@ -626,6 +634,7 @@ const archiveConfirmLabel = computed(() =>
                   @delete="handleDelete"
                   @editHistory="handleEditHistory"
                   @deleteHistory="handleDeleteHistory"
+                  @updateNotes="handleUpdateNotes"
                   @delivery="handleDelivery"
                   @addFailedProduction="handleAddFailedProduction"
                 />
@@ -897,7 +906,7 @@ const archiveConfirmLabel = computed(() =>
   flex-direction: column;
   gap: 10px;
   padding: 8px 6px 10px;
-  max-height: min(52vh, 340px);
+  max-height: min(60vh, 440px);
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -919,7 +928,8 @@ const archiveConfirmLabel = computed(() =>
 
 /* Panel */
 .drawer-panel {
-  width: 300px;
+  width: min(400px, 42vw);
+  min-width: 320px;
   height: 100%;
   background: #fff;
   border-right: 1px solid #e5e7eb;
