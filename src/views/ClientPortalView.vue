@@ -5,13 +5,13 @@ import { useI18n } from 'vue-i18n'
 
 import { useAuthStore } from '../stores/auth'
 import { useClientPortalStore } from '../stores/clientPortal'
+import type { ClientJobRecord } from '../types/client'
 
 const authStore = useAuthStore()
 const portalStore = useClientPortalStore()
 const { t } = useI18n()
 
-const { filteredJobs, loading, error, searchTerm, showArchived, sortBy, sortDir } =
-  storeToRefs(portalStore)
+const { filteredJobs, loading, error, searchTerm, showArchived } = storeToRefs(portalStore)
 
 const companyName = computed(() => authStore.clientCompanyName ?? t('clients.portalTitle'))
 
@@ -38,6 +38,26 @@ function totalProduced(job: {
   parts_overproduced: number
 }) {
   return job.parts_produced + (job.parts_overproduced ?? 0)
+}
+
+function readyForPickup(job: ClientJobRecord) {
+  return Math.max(0, totalProduced(job) - (job.delivered ?? 0))
+}
+
+function displayPurchaseOrder(job: ClientJobRecord) {
+  const s = job.purchase_order?.trim()
+  return s ? s : null
+}
+
+function displayInvoice(job: ClientJobRecord) {
+  const s = job.invoice?.trim()
+  return s ? s : null
+}
+
+function rowStatusClass(job: ClientJobRecord) {
+  if (job.status === 'archived') return 'job-row-archived'
+  if (job.status === 'completed') return 'job-row-completed'
+  return 'job-row-active'
 }
 
 onMounted(async () => {
@@ -81,26 +101,6 @@ onUnmounted(() => {
         class="search-input"
         :placeholder="t('clients.searchPlaceholder')"
       />
-      <label class="toolbar-field">
-        <span class="sr-only">{{ t('clients.sortByLabel') }}</span>
-        <select v-model="sortBy" class="toolbar-select" :aria-label="t('clients.sortByLabel')">
-          <option value="updated_at">{{ t('clients.sortByUpdatedAt') }}</option>
-          <option value="status">{{ t('clients.sortByStatus') }}</option>
-        </select>
-      </label>
-      <label class="toolbar-field">
-        <span class="sr-only">{{ t('clients.sortOrderLabel') }}</span>
-        <select v-model="sortDir" class="toolbar-select" :aria-label="t('clients.sortOrderLabel')">
-          <template v-if="sortBy === 'updated_at'">
-            <option value="desc">{{ t('clients.sortDateNewest') }}</option>
-            <option value="asc">{{ t('clients.sortDateOldest') }}</option>
-          </template>
-          <template v-else>
-            <option value="asc">{{ t('clients.sortStatusActiveFirst') }}</option>
-            <option value="desc">{{ t('clients.sortStatusArchivedFirst') }}</option>
-          </template>
-        </select>
-      </label>
       <button
         class="btn btn-secondary"
         :class="{ 'is-loading': loading }"
@@ -136,53 +136,62 @@ onUnmounted(() => {
           <thead>
             <tr>
               <th>{{ t('jobs.jobName') }}</th>
-              <th>{{ t('clients.partsRequested') }}</th>
-              <th>{{ t('clients.partsProduced') }}</th>
-              <th>{{ t('clients.partsDelivered') }}</th>
-              <th>{{ t('clients.progress') }}</th>
-              <th>{{ t('clients.stageSummary') }}</th>
+              <th>{{ t('clients.requested') }}</th>
+              <th>{{ t('clients.produced') }}</th>
+              <th>{{ t('clients.delivered') }}</th>
+              <th>{{ t('clients.readyForPickup') }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="job in filteredJobs" :key="job.id">
-              <td class="job-name-cell">
-                <div class="job-name">{{ job.name }}</div>
-                <span
-                  class="badge"
-                  :class="{
-                    'badge-success': job.status === 'completed',
-                    'badge-info': job.status === 'active',
-                  }"
-                >
-                  {{ t(`jobs.status.${job.status}`) }}
-                </span>
-                <span
-                  class="badge"
-                  :class="{
-                    'badge-info': (job.priority ?? 'normal') === 'normal',
-                    'badge-warning': job.priority === 'high',
-                    'badge-danger': job.priority === 'urgent',
-                  }"
-                >
-                  {{ t(`jobs.priority.${job.priority ?? 'normal'}`) }}
-                </span>
+            <tr v-for="job in filteredJobs" :key="job.id" class="job-row">
+              <td class="job-name-cell" :class="rowStatusClass(job)">
+                <div class="job-name-block">
+                  <div class="job-name-line">
+                    <template v-if="displayPurchaseOrder(job)">
+                      <span class="po-before-name">PO: {{ displayPurchaseOrder(job) }}</span>
+                      {{ ' ' }}
+                    </template>
+                    <span class="job-name">{{ job.name }}</span>
+                  </div>
+                  <div class="job-name-meta">
+                    <span
+                      class="badge"
+                      :class="{
+                        'badge-success': job.status === 'completed',
+                        'badge-info': job.status === 'active',
+                        'badge-muted': job.status === 'archived',
+                      }"
+                    >
+                      {{ t(`jobs.status.${job.status}`) }}
+                    </span>
+                    <span v-if="displayInvoice(job)" class="invoice-meta">
+                      {{ t('jobs.invoice') }}: {{ displayInvoice(job) }}
+                    </span>
+                    <span
+                      class="badge"
+                      :class="{
+                        'badge-info': (job.priority ?? 'normal') === 'normal',
+                        'badge-warning': job.priority === 'high',
+                        'badge-danger': job.priority === 'urgent',
+                      }"
+                    >
+                      {{ t(`jobs.priority.${job.priority ?? 'normal'}`) }}
+                    </span>
+                  </div>
+                  <div class="progress-under-name">
+                    <div class="progress-copy">
+                      {{ productionProgress(job) }}%
+                    </div>
+                    <div class="progress-track" aria-hidden="true">
+                      <div class="progress-fill" :style="{ width: `${productionProgress(job)}%` }" />
+                    </div>
+                  </div>
+                </div>
               </td>
               <td>{{ job.parts_needed }}</td>
               <td>{{ totalProduced(job) }}</td>
               <td>{{ job.delivered }}</td>
-              <td class="progress-cell">
-                <div class="progress-copy">
-                  {{ productionProgress(job) }}%
-                </div>
-                <div class="progress-track" aria-hidden="true">
-                  <div class="progress-fill" :style="{ width: `${productionProgress(job)}%` }" />
-                </div>
-              </td>
-              <td class="stage-cell">
-                <div>{{ t('clients.partsRequested') }}: {{ job.parts_needed }}</div>
-                <div>{{ t('clients.partsProduced') }}: {{ totalProduced(job) }}</div>
-                <div>{{ t('clients.partsDelivered') }}: {{ job.delivered }}</div>
-              </td>
+              <td>{{ readyForPickup(job) }}</td>
             </tr>
           </tbody>
         </table>
@@ -219,31 +228,6 @@ onUnmounted(() => {
   flex: 1;
   min-width: 160px;
   margin: 0;
-}
-
-.toolbar-field {
-  display: flex;
-  align-items: center;
-  margin: 0;
-}
-
-.toolbar-select {
-  width: auto;
-  min-width: 160px;
-  max-width: 100%;
-  margin: 0;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 .state {
@@ -287,22 +271,73 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.job-name-cell.job-row-active {
+  box-shadow: inset 4px 0 0 0 #2563eb;
+}
+
+.job-name-cell.job-row-completed {
+  box-shadow: inset 4px 0 0 0 #16a34a;
+}
+
+.job-name-cell.job-row-archived {
+  box-shadow: inset 4px 0 0 0 #9ca3af;
+}
+
 .job-name-cell {
-  min-width: 220px;
+  min-width: 280px;
+}
+
+.job-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.job-name-line {
+  font-weight: 600;
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.35;
+}
+
+.po-before-name {
+  font-weight: 600;
+  color: #374151;
 }
 
 .job-name {
   font-weight: 600;
-  margin-bottom: 8px;
 }
 
-.progress-cell {
-  min-width: 200px;
+.job-name-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.invoice-meta {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.3;
+}
+
+.badge-muted {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.progress-under-name {
+  width: 100%;
+  max-width: 320px;
 }
 
 .progress-copy {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-weight: 600;
+  font-size: 13px;
+  color: #374151;
 }
 
 .progress-track {
@@ -316,11 +351,6 @@ onUnmounted(() => {
   height: 100%;
   background: #2563eb;
   border-radius: 999px;
-}
-
-.stage-cell {
-  min-width: 220px;
-  color: #4b5563;
 }
 
 @media (max-width: 768px) {

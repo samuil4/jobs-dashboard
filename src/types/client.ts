@@ -22,6 +22,8 @@ export interface ClientFormPayload {
 export interface ClientJobRecord {
   id: string
   name: string
+  purchase_order: string | null
+  invoice: string | null
   parts_needed: number
   parts_produced: number
   parts_overproduced: number
@@ -29,5 +31,6 @@ export interface ClientJobRecord {
   archived: boolean
   status: 'active' | 'completed' | 'archived'
   priority: 'low' | 'normal' | 'high' | 'urgent'
+  created_at: string
   updated_at: string
 }
