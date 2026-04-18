@@ -32,6 +32,7 @@ const LS_ARCHIVED_COLUMN_COLLAPSED = 'dashboard:archivedColumnCollapsed'
 const LS_CLIENT_GROUP_ORDER = 'dashboard:clientGroupOrder'
 const LS_CLIENT_GROUP_DETAILS_OPEN = 'dashboard:clientGroupDetailsOpen'
 const LS_EXPANDED_ARCHIVED_CLIENT_GROUP = 'dashboard:expandedArchivedClientGroupKey'
+const LS_PO_SUBGROUP_OPEN = 'dashboard:poSubgroupCollapsed'
 
 type ClientGroupDetailsOpenState = {
   active: Record<string, boolean>
@@ -162,8 +163,46 @@ const orderedActiveGroupsWithPo = computed(() =>
   })),
 )
 
-/** PO sections in the main table: expanded by default; false = collapsed. */
-const poSubgroupOpen = ref<Record<string, boolean>>({})
+/** PO sections: expanded by default; false = collapsed. Persist only collapsed keys in localStorage. */
+function loadPoSubgroupOpen(): Record<string, boolean> {
+  if (typeof localStorage === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(LS_PO_SUBGROUP_OPEN)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const out: Record<string, boolean> = {}
+    for (const [key, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof key === 'string' && key.length > 0 && v === false) {
+        out[key] = false
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function persistPoSubgroupOpen(m: Record<string, boolean>) {
+  if (typeof localStorage === 'undefined') return
+  const collapsed: Record<string, boolean> = {}
+  for (const [k, v] of Object.entries(m)) {
+    if (v === false) collapsed[k] = false
+  }
+  try {
+    if (Object.keys(collapsed).length === 0) {
+      localStorage.removeItem(LS_PO_SUBGROUP_OPEN)
+    } else {
+      localStorage.setItem(LS_PO_SUBGROUP_OPEN, JSON.stringify(collapsed))
+    }
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+const poSubgroupOpen = ref<Record<string, boolean>>(loadPoSubgroupOpen())
+
+watch(poSubgroupOpen, persistPoSubgroupOpen, { deep: true })
 
 function poSubgroupCompositeKey(clientKey: string, poKey: string) {
   return `${clientKey}::${poKey}`
@@ -180,7 +219,14 @@ function togglePoSubgroup(clientKey: string, poKey: string) {
   const k = poSubgroupCompositeKey(clientKey, poKey)
   const m = poSubgroupOpen.value
   const cur = m[k] === undefined ? true : m[k]!
-  poSubgroupOpen.value = { ...m, [k]: !cur }
+  const next = !cur
+  const nextMap = { ...m, [k]: next }
+  if (next) {
+    delete nextMap[k]
+  } else {
+    nextMap[k] = false
+  }
+  poSubgroupOpen.value = nextMap
 }
 
 function loadArchivedColumnCollapsed(): boolean {
