@@ -30,7 +30,8 @@ export default {
     install: 'Встановити застосунок',
     installing: 'Встановлення…',
     updateAvailableTitle: 'Доступне оновлення',
-    updateAvailableMessage: 'Доступна новіша версія застосунку. Поточна: v{current}. Нова: v{next}.',
+    updateAvailableMessage:
+      'Доступне новіше розгортання. Поточна: {current}. Нова: {next}.',
     updateNow: 'Оновити застосунок',
   },
   webPush: {

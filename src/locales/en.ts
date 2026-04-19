@@ -30,7 +30,8 @@ export default {
     install: 'Install app',
     installing: 'Installing…',
     updateAvailableTitle: 'Update available',
-    updateAvailableMessage: 'A newer app version is ready. Current: v{current}. New: v{next}.',
+    updateAvailableMessage:
+      'A newer deployment is ready. Current: {current}. New: {next}.',
     updateNow: 'Refresh app',
   },
   webPush: {

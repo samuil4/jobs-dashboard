@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 
 import LanguageSwitcher from './LanguageSwitcher.vue'
 import { useClientWebPush } from '../composables/useClientWebPush'
-import { useAppVersion } from '../composables/useAppVersion'
+import { shortBuildId, useAppVersion } from '../composables/useAppVersion'
 import { usePwaInstall } from '../composables/usePwaInstall'
 import { useShareWebPush } from '../composables/useShareWebPush'
 import { useWebPush } from '../composables/useWebPush'
@@ -37,12 +37,10 @@ const authStore = useAuthStore()
 const appVersion = __APP_VERSION__
 
 const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
-const {
-  previousVersion,
-  hasUpdate,
-  isRefreshing: isRefreshingApp,
-  refreshApp,
-} = useAppVersion()
+const { bundledBuildId, hasUpdate, isRefreshing: isRefreshingApp, updateCurrentLabel, updateNextLabel, refreshApp } =
+  useAppVersion()
+
+const bundledBuildIdShort = computed(() => shortBuildId(bundledBuildId))
 
 const {
   isSupported: webPushSupported,
@@ -163,9 +161,7 @@ const showClientPushButton = computed(
     authStore.isClient,
 )
 
-const showVersionUpdate = computed(
-  () => isInstalled.value && hasUpdate.value && previousVersion.value !== null
-)
+const showVersionUpdate = computed(() => hasUpdate.value)
 </script>
 
 <template>
@@ -177,8 +173,8 @@ const showVersionUpdate = computed(
           <span>
             {{
               t('pwa.updateAvailableMessage', {
-                current: previousVersion,
-                next: appVersion,
+                current: updateCurrentLabel,
+                next: updateNextLabel,
               })
             }}
           </span>
@@ -193,8 +189,11 @@ const showVersionUpdate = computed(
           {{ isRefreshingApp ? t('common.loading') + '…' : t('pwa.updateNow') }}
         </button>
       </div>
-      <span class="app-version" :title="`${t('common.version')} ${appVersion}`">
-        v{{ appVersion }}
+      <span
+        class="app-version"
+        :title="`${t('common.version')} ${appVersion} (${bundledBuildIdShort})`"
+      >
+        v{{ appVersion }} ({{ bundledBuildIdShort }})
       </span>
       <div class="footer-actions">
         <LanguageSwitcher />
