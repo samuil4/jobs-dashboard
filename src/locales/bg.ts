@@ -30,7 +30,8 @@ export default {
     install: 'Инсталиране на приложението',
     installing: 'Инсталиране…',
     updateAvailableTitle: 'Налична е актуализация',
-    updateAvailableMessage: 'Има по-нова версия на приложението. Текуща: v{current}. Нова: v{next}.',
+    updateAvailableMessage:
+      'Има по-нова версия на приложението. Текуща: {current}. Нова: {next}.',
     updateNow: 'Обнови приложението',
   },
   webPush: {

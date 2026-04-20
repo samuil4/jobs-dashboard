@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 
+import AppVersionLine from './AppVersionLine.vue'
 import LanguageSwitcher from './LanguageSwitcher.vue'
 import { useClientWebPush } from '../composables/useClientWebPush'
 import { useAppVersion } from '../composables/useAppVersion'
@@ -34,15 +35,9 @@ const emit = defineEmits<{
 const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
-const appVersion = __APP_VERSION__
 
 const { canInstall, isInstalled, isInstalling, install } = usePwaInstall()
-const {
-  previousVersion,
-  hasUpdate,
-  isRefreshing: isRefreshingApp,
-  refreshApp,
-} = useAppVersion()
+const { hasUpdate, isRefreshing: isRefreshingApp, updateCurrentLabel, updateNextLabel, refreshApp } = useAppVersion()
 
 const {
   isSupported: webPushSupported,
@@ -163,9 +158,7 @@ const showClientPushButton = computed(
     authStore.isClient,
 )
 
-const showVersionUpdate = computed(
-  () => isInstalled.value && hasUpdate.value && previousVersion.value !== null
-)
+const showVersionUpdate = computed(() => hasUpdate.value)
 </script>
 
 <template>
@@ -177,8 +170,8 @@ const showVersionUpdate = computed(
           <span>
             {{
               t('pwa.updateAvailableMessage', {
-                current: previousVersion,
-                next: appVersion,
+                current: updateCurrentLabel,
+                next: updateNextLabel,
               })
             }}
           </span>
@@ -193,9 +186,7 @@ const showVersionUpdate = computed(
           {{ isRefreshingApp ? t('common.loading') + '…' : t('pwa.updateNow') }}
         </button>
       </div>
-      <span class="app-version" :title="`${t('common.version')} ${appVersion}`">
-        v{{ appVersion }}
-      </span>
+      <AppVersionLine />
       <div class="footer-actions">
         <LanguageSwitcher />
         <button
@@ -305,12 +296,6 @@ const showVersionUpdate = computed(
 
 .update-copy strong {
   font-size: 13px;
-}
-
-.app-version {
-  font-size: 12px;
-  color: #6b7280;
-  flex-shrink: 0;
 }
 
 .footer-actions {

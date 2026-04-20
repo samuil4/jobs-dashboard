@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
+import AppVersionLine from '../components/AppVersionLine.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import { useAuthStore } from '../stores/auth'
 
@@ -79,6 +80,7 @@ async function handleSubmit() {
       </form>
 
       <div class="login-footer">
+        <AppVersionLine />
         <LanguageSwitcher />
       </div>
     </div>
@@ -135,7 +137,10 @@ async function handleSubmit() {
 .login-footer {
   margin-top: 24px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 </style>
 
