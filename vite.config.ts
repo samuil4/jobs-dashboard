@@ -1,3 +1,6 @@
+import { execSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 import type { Plugin } from 'vite'
@@ -7,14 +10,48 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const lockfileUrl = new URL('./package-lock.json', import.meta.url)
+
+function hashPackageManifests(): string {
+  const h = createHash('sha256')
+  h.update(JSON.stringify(pkg))
+  const lockPath = fileURLToPath(lockfileUrl)
+  if (existsSync(lockPath)) {
+    h.update(readFileSync(lockPath))
+  }
+  return `pkg-${h.digest('hex').slice(0, 16)}`
+}
+
+function tryGitRevParse(): string | null {
+  try {
+    const out = execSync('git rev-parse HEAD', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+    return /^[0-9a-f]{7,40}$/i.test(out) ? out : null
+  } catch {
+    return null
+  }
+}
+
 function resolveAppBuildId(isDevelopment: boolean): string {
   if (isDevelopment) return 'dev'
-  return (
+
+  const fromEnv =
     process.env.VERCEL_GIT_COMMIT_SHA ??
     process.env.CI_COMMIT_SHA ??
-    process.env.VITE_BUILD_ID ??
-    `build-${Date.now()}`
+    process.env.VITE_BUILD_ID
+  if (fromEnv) return fromEnv
+
+  const gitSha = tryGitRevParse()
+  if (gitSha) return gitSha
+
+  const manifestHash = hashPackageManifests()
+  console.warn(
+    '[vite] jobs-dashboard: resolveAppBuildId — no VERCEL_GIT_COMMIT_SHA, CI_COMMIT_SHA, VITE_BUILD_ID, or git HEAD; using deterministic hash from package.json / package-lock.json:',
+    manifestHash,
   )
+  return manifestHash
 }
 
 function buildMetaPlugin(opts: { version: string; buildId: string }): Plugin {
