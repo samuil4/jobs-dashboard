@@ -671,6 +671,12 @@ function readyForDeliveryRow(job: JobWithHistory) {
   return Math.max(0, totalProduced(job) - (job.delivered ?? 0))
 }
 
+function handleDeliverAllReady(job: JobWithHistory) {
+  const n = readyForDeliveryRow(job)
+  if (n <= 0) return
+  void handleDelivery(job.id, n)
+}
+
 function clientLineLabel(job: JobWithHistory, groupKey: string) {
   if (job.client) return job.client.company_name || job.client.username
   if (groupKey === UNASSIGNED_KEY) return t('jobs.clientUnassigned')
@@ -933,6 +939,20 @@ onUnmounted(() => {
                               ><strong>{{ t('jobs.partsReadyForDelivery') }}</strong>
                               {{ readyForDeliveryRow(job) }}</span
                             >
+                          </div>
+                          <div v-if="readyForDeliveryRow(job) > 0" class="staff-deliver-row">
+                            <button
+                              type="button"
+                              class="btn btn-primary btn-compact"
+                              :disabled="deliveryPendingIds.has(job.id)"
+                              @click="handleDeliverAllReady(job)"
+                            >
+                              {{
+                                deliveryPendingIds.has(job.id)
+                                  ? t('common.saving')
+                                  : t('jobs.deliverReadyParts', { count: readyForDeliveryRow(job) })
+                              }}
+                            </button>
                           </div>
                         </div>
                       </td>
@@ -1325,6 +1345,12 @@ onUnmounted(() => {
   font-weight: 600;
   color: #6b7280;
   margin-right: 4px;
+}
+
+.staff-deliver-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .staff-view-cell {

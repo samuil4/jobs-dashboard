@@ -110,6 +110,7 @@ export default {
     delivered: 'Доставлено',
     failed: 'Браковані',
     partsReadyForDelivery: 'Готово до доставки',
+    deliverReadyParts: 'Доставити {count} деталей',
     tableColumnParts: 'Деталі кількості',
     view: 'Перегляд',
     noPurchaseOrderGroup: 'Без замовлення (PO)',
