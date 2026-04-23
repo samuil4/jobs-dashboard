@@ -110,6 +110,7 @@ export default {
     delivered: 'Доставени',
     failed: 'Неуспешни',
     partsReadyForDelivery: 'Готови за доставка',
+    deliverReadyParts: 'Достави {count} части',
     tableColumnParts: 'Части',
     view: 'Преглед',
     noPurchaseOrderGroup: 'Без поръчка',

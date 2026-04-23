@@ -110,6 +110,7 @@ export default {
     delivered: 'Delivered',
     failed: 'Failed',
     partsReadyForDelivery: 'Ready for delivery',
+    deliverReadyParts: 'Deliver {count} parts',
     tableColumnParts: 'Parts',
     view: 'View',
     noPurchaseOrderGroup: 'No purchase order',
