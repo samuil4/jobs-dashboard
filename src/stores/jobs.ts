@@ -24,6 +24,7 @@ const JOB_SELECT_FIELDS =
   'id, name, purchase_order, invoice, parts_needed, parts_produced, parts_overproduced, notes, delivered, parts_failed, archived, status, priority, assignee, created_at, updated_at, client_id, has_share_password, client:clients(id, username, company_name), job_updates (*)'
 
 type StatusFilter = 'all' | 'active' | 'completed' | 'archived'
+type InvoiceFilter = 'all' | 'no_invoice'
 type SelectedJobResponse = Omit<JobRecord, 'client'> & {
   client?: JobRecord['client'] | NonNullable<JobRecord['client']>[]
   job_updates: JobUpdateRecord[] | null
@@ -40,6 +41,7 @@ export const useJobsStore = defineStore('jobs', () => {
   const error = ref<string | null>(null)
   const searchTerm = ref('')
   const statusFilter = ref<StatusFilter>('all')
+  const invoiceFilter = ref<InvoiceFilter>('all')
   const LS_SHOW_ARCHIVED_KEY = 'jobs:showArchived'
   const showArchived = ref(
     typeof localStorage !== 'undefined' && localStorage.getItem(LS_SHOW_ARCHIVED_KEY) === 'true',
@@ -347,6 +349,11 @@ export const useJobsStore = defineStore('jobs', () => {
     )
   }
 
+  function matchesInvoiceFilter(job: JobWithHistory): boolean {
+    if (invoiceFilter.value === 'all') return true
+    return !job.invoice?.trim()
+  }
+
   const filteredJobs = computed(() => {
     const query = searchTerm.value.trim().toLowerCase()
     return jobs.value.filter((job) => {
@@ -356,6 +363,7 @@ export const useJobsStore = defineStore('jobs', () => {
       if (statusFilter.value !== 'all' && job.status !== statusFilter.value) {
         return false
       }
+      if (!matchesInvoiceFilter(job)) return false
       return matchesSearch(job, query)
     })
   })
@@ -376,6 +384,7 @@ export const useJobsStore = defineStore('jobs', () => {
       if (statusFilter.value === 'completed' && job.status !== 'completed') {
         return false
       }
+      if (!matchesInvoiceFilter(job)) return false
       return matchesSearch(job, query)
     })
   })
@@ -388,6 +397,7 @@ export const useJobsStore = defineStore('jobs', () => {
     }
     return jobs.value.filter((job) => {
       if (job.status !== 'archived') return false
+      if (!matchesInvoiceFilter(job)) return false
       return matchesSearch(job, query)
     })
   })
@@ -882,6 +892,7 @@ export const useJobsStore = defineStore('jobs', () => {
     error,
     searchTerm,
     statusFilter,
+    invoiceFilter,
     showArchived,
     filteredJobs,
     filteredMainListJobs,

@@ -8,7 +8,7 @@ import JobShareCard from '../components/JobShareCard.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import { getJobShareData } from '../lib/shareApi'
 import { useAuthStore } from '../stores/auth'
-import { isValidJobId, verifyJobSharePassword } from '../lib/share'
+import { isValidJobId, normalizeJobShareData, verifyJobSharePassword } from '../lib/share'
 import type { JobShareData } from '../types/job'
 
 const SHARE_ACCESS_KEY = 'job-share-access'
@@ -36,7 +36,7 @@ function getStoredAccess(jobId: string): {
       sessionStorage.removeItem(SHARE_ACCESS_KEY)
       return { valid: false }
     }
-    return { valid: true, job: data.job, shareToken: data.shareToken }
+    return { valid: true, job: normalizeJobShareData(data.job), shareToken: data.shareToken }
   } catch {
     return { valid: false }
   }
@@ -113,7 +113,8 @@ async function pollJobData(source: PollSource = 'interval') {
       prev.parts_produced !== next.parts_produced ||
       prev.parts_overproduced !== next.parts_overproduced ||
       prev.delivered !== next.delivered ||
-      prev.parts_needed !== next.parts_needed
+      prev.parts_needed !== next.parts_needed ||
+      (prev.invoice?.trim() ?? '') !== (next.invoice?.trim() ?? '')
     console.log('[JobShare poll] job update', {
       source,
       changed,
@@ -130,6 +131,7 @@ async function pollJobData(source: PollSource = 'interval') {
         parts_produced: next.parts_produced,
         parts_overproduced: next.parts_overproduced,
         delivered: next.delivered,
+        invoice: next.invoice,
       },
     })
     job.value = next

@@ -36,7 +36,9 @@ Deno.serve(async (req) => {
 
     const { data: job, error: fetchError } = await supabase
       .from('jobs')
-      .select('id, name, parts_needed, parts_produced, parts_overproduced, delivered, share_password_hash')
+      .select(
+        'id, name, invoice, parts_needed, parts_produced, parts_overproduced, delivered, share_password_hash'
+      )
       .eq('id', job_id.trim())
       .single()
 
@@ -95,6 +97,7 @@ Deno.serve(async (req) => {
       job: {
         id: job.id,
         name: job.name,
+        invoice: job.invoice ?? null,
         parts_needed: job.parts_needed,
         parts_produced: job.parts_produced,
         parts_overproduced: job.parts_overproduced ?? 0,

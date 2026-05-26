@@ -420,14 +420,17 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      <p v-if="displayInvoice" class="job-header-invoice-row">
-        <span class="invoice-label">{{ t('jobs.invoice') }}:</span>
-        {{ displayInvoice }}
-      </p>
       <div class="job-header-meta-row">
         <span class="assignee">{{ t('jobs.assignee') }}: {{ job.assignee }}</span>
         <span v-if="job.client" class="assignee">{{ t('jobs.client') }}: {{ job.client.company_name }}</span>
         <span :class="statusBadgeClass">{{ t(`jobs.status.${job.status}`) }}</span>
+        <span
+          v-if="displayInvoice"
+          class="invoice-inline"
+          :aria-label="`${t('jobs.invoice')}: ${displayInvoice}`"
+        >
+          {{ t('jobs.invoiceAbbr') }}: {{ displayInvoice }}
+        </span>
         <span :class="priorityBadgeClass">{{ t(`jobs.priority.${effectivePriority}`) }}</span>
         <span class="date">{{ t('jobs.dateAdded') }}: {{ format(new Date(job.created_at), 'dd MMM yyyy') }}</span>
       </div>
@@ -707,19 +710,6 @@ onUnmounted(() => {
   color: #374151;
 }
 
-.job-header-invoice-row {
-  margin: 0;
-  font-size: 14px;
-  color: #4b5563;
-  line-height: 1.4;
-}
-
-.job-header-invoice-row .invoice-label {
-  font-weight: 600;
-  color: #374151;
-  margin-right: 4px;
-}
-
 .job-header-meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -731,6 +721,13 @@ onUnmounted(() => {
   margin: 0;
   color: #4b5563;
   font-size: 14px;
+}
+
+.invoice-inline {
+  font-size: 14px;
+  color: #4b5563;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .menu-wrapper {

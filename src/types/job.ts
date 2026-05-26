@@ -71,6 +71,7 @@ export interface UpdateJobPayload {
 export interface JobShareData {
   id: string
   name: string
+  invoice: string | null
   parts_needed: number
   parts_produced: number
   parts_overproduced: number
