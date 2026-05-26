@@ -21,12 +21,24 @@ const totalProduced = computed(
 const partsReadyForDelivery = computed(
   () => Math.max(0, totalProduced.value - (props.job.delivered ?? 0))
 )
+
+const displayInvoice = computed(() => {
+  const s = props.job.invoice?.trim()
+  return s || ''
+})
 </script>
 
 <template>
   <article class="job-share-card card">
     <header class="job-share-header">
       <h2>{{ job.name }}</h2>
+      <p
+        v-if="displayInvoice"
+        class="invoice-row"
+        :aria-label="`${t('jobs.invoice')}: ${displayInvoice}`"
+      >
+        {{ t('jobs.invoiceAbbr') }}: {{ displayInvoice }}
+      </p>
     </header>
 
     <section class="job-share-body">
@@ -60,9 +72,16 @@ const partsReadyForDelivery = computed(
 }
 
 .job-share-header h2 {
-  margin: 0 0 20px;
+  margin: 0 0 8px;
   font-size: 20px;
   color: #1f2937;
+}
+
+.invoice-row {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.4;
 }
 
 .job-share-body {

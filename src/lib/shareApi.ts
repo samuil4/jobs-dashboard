@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import type { JobShareData } from '../types/job'
-import { isValidJobId } from './share'
+import { isValidJobId, normalizeJobShareData } from './share'
 
 export interface GetJobShareDataResult {
   job?: JobShareData
@@ -34,5 +34,5 @@ export async function getJobShareData(
     return { error: 'Job not found' }
   }
 
-  return { job: result.job }
+  return { job: normalizeJobShareData(result.job) }
 }

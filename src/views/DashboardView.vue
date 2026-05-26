@@ -659,6 +659,11 @@ function displayPurchaseOrderCell(job: JobWithHistory) {
   return s ? s : null
 }
 
+function displayInvoiceCell(job: JobWithHistory) {
+  const s = job.invoice?.trim()
+  return s ? s : null
+}
+
 function totalProduced(job: JobWithHistory) {
   return (job.parts_produced ?? 0) + (job.parts_overproduced ?? 0)
 }
@@ -884,6 +889,13 @@ onUnmounted(() => {
                               }"
                             >
                               {{ t(`jobs.status.${job.status}`) }}
+                            </span>
+                            <span
+                              v-if="displayInvoiceCell(job)"
+                              class="invoice-meta"
+                              :aria-label="`${t('jobs.invoice')}: ${displayInvoiceCell(job)}`"
+                            >
+                              {{ t('jobs.invoiceAbbr') }}: {{ displayInvoiceCell(job) }}
                             </span>
                             <span
                               class="badge"
@@ -1284,6 +1296,12 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+.invoice-meta {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.3;
 }
 
 .badge-muted {

@@ -5,6 +5,9 @@ import { supabase } from '../lib/supabase'
 import type { ClientJobRecord } from '../types/client'
 import type { JobUpdateRecord, UpdateType } from '../types/job'
 
+/** Main table filter (client portal toolbar). */
+export type ClientPortalListFilter = 'all' | 'active_only' | 'no_invoice' | 'with_invoice'
+
 const CLIENT_JOB_FIELDS =
   'id, name, purchase_order, invoice, parts_needed, parts_produced, parts_overproduced, delivered, archived, status, priority, created_at, updated_at'
 
@@ -13,6 +16,7 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const searchTerm = ref('')
+  const listFilter = ref<ClientPortalListFilter>('active_only')
   const showArchived = ref(false)
   const activeClientId = ref<string | null>(null)
   let channel: ReturnType<typeof supabase.channel> | null = null
@@ -128,6 +132,7 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     jobs.value = []
     activeClientId.value = null
     showArchived.value = false
+    listFilter.value = 'active_only'
     error.value = null
   }
 
@@ -157,19 +162,29 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
   }
 
   const filteredJobs = computed(() => {
+    let list = [...jobs.value]
+
+    if (listFilter.value === 'active_only') {
+      list = list.filter((job) => job.status === 'active')
+    } else if (listFilter.value === 'no_invoice') {
+      list = list.filter((job) => !job.invoice?.trim())
+    } else if (listFilter.value === 'with_invoice') {
+      list = list.filter((job) => Boolean(job.invoice?.trim()))
+    }
+
     const query = searchTerm.value.trim().toLowerCase()
-    const list = !query
-      ? [...jobs.value]
-      : jobs.value.filter((job) => {
-          const name = job.name?.toLowerCase() ?? ''
-          const po = job.purchase_order?.trim().toLowerCase() ?? ''
-          const inv = job.invoice?.trim().toLowerCase() ?? ''
-          return (
-            name.includes(query) ||
-            (po.length > 0 && po.includes(query)) ||
-            (inv.length > 0 && inv.includes(query))
-          )
-        })
+    if (query) {
+      list = list.filter((job) => {
+        const name = job.name?.toLowerCase() ?? ''
+        const po = job.purchase_order?.trim().toLowerCase() ?? ''
+        const inv = job.invoice?.trim().toLowerCase() ?? ''
+        return (
+          name.includes(query) ||
+          (po.length > 0 && po.includes(query)) ||
+          (inv.length > 0 && inv.includes(query))
+        )
+      })
+    }
 
     list.sort((a, b) => {
       const st = statusSortRank(a.status) - statusSortRank(b.status)
@@ -193,6 +208,7 @@ export const useClientPortalStore = defineStore('clientPortal', () => {
     loading,
     error,
     searchTerm,
+    listFilter,
     showArchived,
     filteredJobs,
     fetchJobs,

@@ -15,6 +15,14 @@ export function isValidJobId(jobId: string): boolean {
   return typeof jobId === 'string' && UUID_REGEX.test(jobId.trim())
 }
 
+/** Ensures `invoice` is present (older share API payloads or sessionStorage may omit it). */
+export function normalizeJobShareData(job: JobShareData): JobShareData {
+  return {
+    ...job,
+    invoice: job.invoice ?? null,
+  }
+}
+
 export async function verifyJobSharePassword(
   jobId: string,
   password: string
@@ -34,6 +42,9 @@ export async function verifyJobSharePassword(
   const result = data as { valid: boolean; job?: JobShareData; shareToken?: string; error?: string } | null
   if (!result || typeof result.valid !== 'boolean') {
     return { valid: false }
+  }
+  if (result.job) {
+    return { ...result, job: normalizeJobShareData(result.job) }
   }
   return result
 }

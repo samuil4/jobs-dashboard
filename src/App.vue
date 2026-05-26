@@ -19,7 +19,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-const { searchTerm, statusFilter } = storeToRefs(jobsStore)
+const { searchTerm, statusFilter, invoiceFilter } = storeToRefs(jobsStore)
 
 const menuOpen = ref(false)
 const menuAnchorRef = ref<HTMLElement | null>(null)
@@ -115,6 +115,10 @@ watch(
             <option value="active">{{ t('jobs.filter.active') }}</option>
             <option value="completed">{{ t('jobs.filter.completed') }}</option>
             <option value="archived">{{ t('jobs.filter.archived') }}</option>
+          </select>
+          <select id="invoice-filter" v-model="invoiceFilter" class="header-select">
+            <option value="all">{{ t('jobs.filter.invoiceAll') }}</option>
+            <option value="no_invoice">{{ t('jobs.filter.noInvoice') }}</option>
           </select>
         </template>
         <h1 v-else class="header-title">{{ pageTitle }}</h1>
