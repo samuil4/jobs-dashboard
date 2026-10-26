@@ -7,8 +7,9 @@ Manufacturing jobs dashboard built with Vue 3 + Vite. Tracks production targets,
 - Create, edit and archive jobs with name, optional **purchase order (PO)** (shown as `PO: …` before the job name on staff cards and in the client portal only when set), optional **invoice** (staff job form only; in the client portal it appears after the status badge on the job row when set), target quantity, produced quantity, assignee (`Samuil`, `Oleksii`, `Veselin`), and priority (`Low`, `Normal`, `High`, `Urgent`) with color-coded badges.
 - Assign each job to a client, or leave it unassigned.
 - Manage clients from a dedicated staff page with add, edit, delete, and calculated workload totals.
+- Staff-only **Statistics** page with delivered-parts totals per month, month-over-month and day-by-day differential views, cumulative totals, and per-job/per-client breakdowns (calculated from delivery history).
 - Client portal with separate login, client-only routing, and client-only job visibility: jobs table with status color accent (active blue, completed green, archived gray), columns **Requested / Produced / Delivered / Ready for pickup** (produced minus delivered), PO before the job name when present, invoice after the status badge when set, progress under the name, fixed ordering (in-progress jobs first by priority, then completed, then archived; ties by `created_at` newest first), and search by job name, PO, or invoice.
-- Header actions grouped into a dropdown menu, including navigation to the clients page.
+- Header actions grouped into a dropdown menu, including navigation to the clients and statistics pages.
 - Incremental production updates with confirmation when exceeding the remaining quantity.
 - Automatic completion state when produced equals required.
 - History timeline for every job update.
@@ -353,6 +354,18 @@ After applying migration `0007_clients_and_client_access.sql` and deploying `man
 
 Client credentials are stored in Supabase Auth. Client usernames are converted internally to emails using the fixed domain `clients.jobs-dashboard.local`, so client accounts should be created through the app's clients page rather than manually in the Auth dashboard.
 
+### Statistics
+
+The staff-only **Statistics** page at `/statistics` reports delivered parts using `job_updates` rows with `update_type = 'delivery'`. It needs no schema change: totals are derived from the same delivery history shown in each job's timeline, so editing or deleting a delivery entry is reflected the next time the page is loaded.
+
+- Monthly view: zero-filled series for the selected range (6, 12, or 24 months), each month compared with the previous month (absolute difference, percent change, and cumulative total).
+- Daily view: day-by-day series for the selected month, each day compared with the previous calendar day (day 1 compares with the last day of the previous month).
+- Summary cards for the selected month: delivered total, previous-month total, difference, percent change (shown as "New" when the previous month was 0), deliveries, jobs, active days, average per active day, and best day.
+- Per-job and per-client breakdowns with share of the selected month's total.
+- Optional client filter derived from the fetched delivery history.
+
+The page reads a rolling 25-month window (one extra month supplies the baseline for the oldest visible month), paginating `job_updates` in 1000-row pages to avoid the PostgREST row cap. Applying `supabase/migrations/0012_delivery_stats_index.sql` adds a partial index that keeps these date-range scans fast; it is optional but recommended for larger datasets.
+
 ## Environment Variables
 
 Create a `.env.local` file in the project root:
@@ -393,6 +406,7 @@ If the code is already pulled locally, the remaining setup to make the new clien
 7. Ensure `SUPABASE_SERVICE_ROLE_KEY` is available to the deployed Edge Functions.
 8. Create at least one staff account in Supabase Auth.
 9. Sign in as staff and create client accounts from the new clients page instead of creating them manually in the Supabase Auth dashboard.
+10. Optionally apply `supabase/migrations/0012_delivery_stats_index.sql` to speed up the statistics page.
 
 Recommended manual verification after setup:
 
@@ -409,6 +423,9 @@ Recommended manual verification after setup:
 11. Staff can edit notes on jobs in the completed/archived column.
 12. Client portal list order and columns match the behavior described under **Features** (including **Ready for pickup**).
 13. Staff can set an optional invoice; clients see it after the status on the portal row when present.
+14. Staff can open `/statistics`; clients are redirected to `/client/jobs`.
+15. Recording a delivery updates the statistics totals, month/day differentials, cumulative values, and breakdowns after a refresh.
+16. Month navigation, range selection, client filter, and the month/day tabs all update the statistics as expected.
 
 ### Build for Production
 
