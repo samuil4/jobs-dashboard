@@ -242,7 +242,7 @@ export default {
       allClients: 'Усі клієнти',
       range: 'Діапазон місяців',
     },
-    rangeMonths: '{count} місяців',
+    rangeMonths: '{count} місяць | {count} місяці | {count} місяців',
     tabs: {
       byMonth: 'За місяцями',
       byDay: 'За днями',

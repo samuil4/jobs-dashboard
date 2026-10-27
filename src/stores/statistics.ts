@@ -15,6 +15,7 @@ import { normalizeDeliveryRows, STATISTICS_FETCH_MONTHS } from '../utils/deliver
 /** PostgREST caps a single response at 1000 rows unless configured otherwise. */
 const PAGE_SIZE = 1000
 const MAX_PAGES = 25
+const FETCH_LIMIT_ERROR = `Delivery history exceeds ${MAX_PAGES * PAGE_SIZE} rows, so statistics were not loaded.`
 
 const DELIVERY_SELECT_FIELDS =
   'id, job_id, delta, created_at, job:jobs(id, name, purchase_order, invoice, archived, client:clients(id, username, company_name))'
@@ -72,7 +73,8 @@ export const useStatisticsStore = defineStore('statistics', () => {
     error.value = null
     const span = Math.max(1, Math.floor(months))
     const from = startOfMonth(subMonths(new Date(), span - 1)).toISOString()
-    const collected: DeliveryUpdateRow[] = []
+    const collected = new Map<string, DeliveryUpdateRow>()
+    let reachedEnd = false
 
     try {
       for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -92,11 +94,24 @@ export const useStatisticsStore = defineStore('statistics', () => {
         }
 
         const pageRows = (data ?? []) as unknown as DeliveryUpdateRowRaw[]
-        collected.push(...pageRows.map(normalizeDeliveryRow))
-        if (pageRows.length < PAGE_SIZE) break
+        // Offset pagination can repeat rows when records are inserted between page requests.
+        for (const raw of pageRows) {
+          const row = normalizeDeliveryRow(raw)
+          collected.set(row.id, row)
+        }
+        if (pageRows.length < PAGE_SIZE) {
+          reachedEnd = true
+          break
+        }
       }
 
-      updates.value = normalizeDeliveryRows(collected)
+      if (!reachedEnd) {
+        // The last allowed page was full, so more rows may exist: do not publish partial data.
+        error.value = FETCH_LIMIT_ERROR
+        return
+      }
+
+      updates.value = normalizeDeliveryRows([...collected.values()])
       lastFetchedAt.value = new Date().toISOString()
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)

@@ -71,20 +71,28 @@ router.beforeEach(async (to, _from, next) => {
     })
   }
 
-  if (authStore.isAuthenticated && authStore.isClient && audience === 'staff') {
-    return next({ name: 'clientJobs' })
+  // Only redirect signed-in users away from the login screens once their role is known,
+  // so an unresolved role never bounces between /login and a staff-only route.
+  if (to.name === 'login' && authStore.isAuthenticated) {
+    if (authStore.isClient) return next({ name: 'clientJobs' })
+    if (authStore.isStaff) return next({ name: 'dashboard' })
+    return next()
+  }
+
+  if (to.name === 'clientLogin' && authStore.isAuthenticated) {
+    if (authStore.isClient) return next({ name: 'clientJobs' })
+    if (authStore.isStaff) return next({ name: 'dashboard' })
+    return next()
+  }
+
+  // Staff areas are staff-only: clients go to their portal, unresolved roles are denied.
+  if (audience === 'staff' && authStore.isAuthenticated && !authStore.isStaff) {
+    if (authStore.isClient) return next({ name: 'clientJobs' })
+    return next({ name: 'login', query: { redirect: to.fullPath } })
   }
 
   if (authStore.isAuthenticated && authStore.isStaff && audience === 'client') {
     return next({ name: 'dashboard' })
-  }
-
-  if (to.name === 'login' && authStore.isAuthenticated) {
-    return next({ name: authStore.isClient ? 'clientJobs' : 'dashboard' })
-  }
-
-  if (to.name === 'clientLogin' && authStore.isAuthenticated) {
-    return next({ name: authStore.isClient ? 'clientJobs' : 'dashboard' })
   }
 
   return next()

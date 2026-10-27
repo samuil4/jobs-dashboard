@@ -275,7 +275,7 @@ export function buildClientBreakdown(
     }
     groups.set(key, {
       label: client ? client.company_name || client.username : unassignedLabel,
-      secondaryLabel: client ? client.username : row.job?.name ?? null,
+      secondaryLabel: client ? client.username : null,
       total: row.delta,
       deliveries: 1,
     })

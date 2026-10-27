@@ -41,9 +41,7 @@ const selectedMonthDate = computed(() => monthKeyToDate(selectedMonthKey.value) 
 
 const monthInput = computed({
   get: () => selectedMonthKey.value,
-  set: (value: string) => {
-    if (monthKeyToDate(value)) selectedMonthKey.value = value
-  },
+  set: (value: string) => selectMonth(value),
 })
 
 const clientOptions = computed(() => {
@@ -94,7 +92,7 @@ function clampMonthKey(key: string): string {
 }
 
 function shiftMonth(offset: number): void {
-  selectedMonthKey.value = clampMonthKey(monthKey(addMonths(selectedMonthDate.value, offset)))
+  selectMonth(monthKey(addMonths(selectedMonthDate.value, offset)))
 }
 
 function ensureRangeCoversSelection(): void {
@@ -115,6 +113,8 @@ function openMonth(key: string): void {
 /** On first load, jump to the latest month that actually has deliveries. */
 function applyInitialMonth(): void {
   if (initialMonthApplied) return
+  // Wait for a successful, non-empty load so a later refresh can still apply the initial month.
+  if (statisticsStore.error || statisticsStore.updates.length === 0) return
   initialMonthApplied = true
   if (getMonthRows(statisticsStore.updates, selectedMonthKey.value).length > 0) return
   const latest = [...buildMonthlyStats(statisticsStore.updates, 24, today)]
