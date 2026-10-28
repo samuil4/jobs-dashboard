@@ -3,6 +3,7 @@ import { createI18n } from 'vue-i18n'
 import bg from '../locales/bg'
 import en from '../locales/en'
 import uk from '../locales/uk'
+import { pluralRules } from './pluralization'
 
 export const AVAILABLE_LOCALES = [
   { code: 'en', label: 'English' },
@@ -25,6 +26,7 @@ export const i18n = createI18n({
   legacy: false,
   locale: resolveLocale(),
   fallbackLocale: 'en',
+  pluralRules,
   messages: {
     en,
     bg,

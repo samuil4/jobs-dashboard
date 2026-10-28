@@ -35,8 +35,10 @@ const showFooter = computed(
 )
 const isDashboard = computed(() => route.name === 'dashboard')
 const isClientsPage = computed(() => route.name === 'clients')
+const isStatisticsPage = computed(() => route.name === 'statistics')
 const pageTitle = computed(() => {
   if (isClientsPage.value) return t('clients.heading')
+  if (isStatisticsPage.value) return t('statistics.heading')
   return t('navigation.dashboard')
 })
 const footerPushMode = computed(() => (isClientRoute.value ? 'client' : 'auth'))
@@ -63,7 +65,7 @@ function handleAddClient() {
   menuOpen.value = false
 }
 
-function navigateTo(name: 'dashboard' | 'clients') {
+function navigateTo(name: 'dashboard' | 'clients' | 'statistics') {
   menuOpen.value = false
   router.push({ name })
 }
@@ -151,6 +153,15 @@ watch(
               @click="navigateTo('clients')"
             >
               {{ t('navigation.clients') }}
+            </button>
+            <button
+              v-if="!isStatisticsPage"
+              class="menu-item"
+              type="button"
+              role="menuitem"
+              @click="navigateTo('statistics')"
+            >
+              {{ t('navigation.statistics') }}
             </button>
             <button
               v-if="isDashboard"
